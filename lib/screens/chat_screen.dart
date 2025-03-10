@@ -23,6 +23,7 @@ class _ChatPageState extends State<ChatPage> {
   final ChatService _chatService = ChatService();
   final TextEditingController _messageController = TextEditingController();
   late String chatId;
+  int _selectedMessageIndex = -1;
 
   @override
   void initState() {
@@ -61,31 +62,42 @@ class _ChatPageState extends State<ChatPage> {
                   itemBuilder: (context, index) {
                     final message = messages[index].data() as Map<String, dynamic>;
                     final isCurrentUser = message['senderId'] == widget.currentUserId;
+                    final timestamp = message['timestamp'] as Timestamp?;
+                    String formattedTime = timestamp != null
+                        ? "${timestamp.toDate().hour}:${timestamp.toDate().minute.toString().padLeft(2, '0')}"
+                        : "";
 
-                    return Align(
-                      alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                        padding: EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: isCurrentUser ? Colors.blue : Colors.grey[300],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (!isCurrentUser)
-                              CircleAvatar(
-                                backgroundImage: NetworkImage(widget.contactImage),
-                                radius: 15,
-                              ),
-                            SizedBox(width: 10),
-                            Text(
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedMessageIndex = (_selectedMessageIndex == index) ? -1 : index;
+                        });
+                      },
+                      child: Column(
+                        crossAxisAlignment:
+                        isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                            padding: EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isCurrentUser ? Colors.blue : Colors.grey[300],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
                               message['message'],
                               style: TextStyle(color: isCurrentUser ? Colors.white : Colors.black),
                             ),
-                          ],
-                        ),
+                          ),
+                          if (_selectedMessageIndex == index)
+                            Padding(
+                              padding: EdgeInsets.only(left: 10, right: 10),
+                              child: Text(
+                                formattedTime,
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ),
+                        ],
                       ),
                     );
                   },

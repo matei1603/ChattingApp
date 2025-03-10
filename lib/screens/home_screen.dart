@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'add_contact_screen.dart'; // AddContactPage import
-import 'chat_screen.dart'; // ChatPage import
-import 'profile_screen.dart'; // ProfileScreen import
+import 'add_contact_screen.dart';
+import 'chat_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final String currentUserId;
@@ -18,7 +18,6 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.account_circle),
             onPressed: () {
-              // Navigate to ProfileScreen
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -52,25 +51,43 @@ class HomeScreen extends StatelessWidget {
               itemCount: conversations.length,
               itemBuilder: (context, index) {
                 final conversation = conversations[index];
+                final data = conversation.data() as Map<String, dynamic>?; // Safe cast
+
+                // Ensure 'contactName' exists
+                final contactName = data != null && data.containsKey('contactName')
+                    ? data['contactName']
+                    : 'Unknown';
+
                 final contactId = conversation.id;
-                final contactName = conversation['contactName'] ?? 'Unknown';
-                final contactImage = conversation['contactImage'] as String?;
-                final lastMessage = conversation['lastMessage'] ?? '';
-                final lastMessageTimestamp = conversation['lastMessageTimestamp'];
-                final seen = conversation['seen'] ?? true;
+                final contactImage = data != null && data.containsKey('contactImage')
+                    ? data['contactImage']
+                    : '';
+                final lastMessage = data != null && data.containsKey('lastMessage')
+                    ? data['lastMessage']
+                    : '';
+                final lastMessageTimestamp = data != null && data.containsKey('lastMessageTimestamp')
+                    ? data['lastMessageTimestamp'] as Timestamp?
+                    : null;
+                final seen = data != null && data.containsKey('seen')
+                    ? data['seen']
+                    : true;
 
                 return ListTile(
                   leading: CircleAvatar(
                     radius: 24,
-                    backgroundImage: contactImage != null && contactImage.isNotEmpty
+                    backgroundImage: contactImage.isNotEmpty
                         ? NetworkImage(contactImage)
                         : const AssetImage('assets/profile_pic.jpg') as ImageProvider,
                   ),
-                  title: Text(contactName),
+                  title: Text(
+                    contactName,
+                    style: TextStyle(fontWeight: seen ? FontWeight.normal : FontWeight.bold),
+                  ),
                   subtitle: Text(
                     lastMessage,
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
+                    style: TextStyle(color: seen ? Colors.black : Colors.blue),
                   ),
                   trailing: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -87,7 +104,6 @@ class HomeScreen extends StatelessWidget {
                     ],
                   ),
                   onTap: () {
-                    // Navigate to ChatPage
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -95,7 +111,7 @@ class HomeScreen extends StatelessWidget {
                           currentUserId: currentUserId,
                           contactId: contactId,
                           contactName: contactName,
-                          contactImage: contactImage ?? '',
+                          contactImage: contactImage,
                         ),
                       ),
                     );
@@ -109,7 +125,6 @@ class HomeScreen extends StatelessWidget {
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
         onPressed: () {
-          // Navigate to AddContactPage
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -121,17 +136,14 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Helper function to format the timestamp
   String _formatTimestamp(Timestamp timestamp) {
     final date = timestamp.toDate();
     final now = DateTime.now();
 
-    if (date.year == now.year &&
-        date.month == now.month &&
-        date.day == now.day) {
-      return "${date.hour}:${date.minute.toString().padLeft(2, '0')}"; // Format as HH:MM
+    if (date.year == now.year && date.month == now.month && date.day == now.day) {
+      return "${date.hour}:${date.minute.toString().padLeft(2, '0')}";
     }
 
-    return "${date.day}/${date.month}/${date.year}"; // Format as DD/MM/YYYY
+    return "${date.day}/${date.month}/${date.year}";
   }
 }

@@ -1,4 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+Future<void> _saveUserToFirestore(User user, String name) async {
+  final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+
+  await userRef.set({
+    "name": name,
+    "email": user.email,
+    "profilePicture": user.photoURL ?? "", // Store profile picture if available
+    "contacts": [], // Empty list at first
+    "createdAt": FieldValue.serverTimestamp(),
+  });
+}
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -32,9 +45,12 @@ class AuthService {
       // Update display name
       await userCredential.user?.updateDisplayName(name);
 
+      // Save to Firestore
+      await _saveUserToFirestore(userCredential.user!, name);
+
       return userCredential.user;
     } catch (e) {
-      throw e; // Re-throw the error to handle it in the UI
+      throw e;
     }
   }
 

@@ -25,17 +25,36 @@ class ContactsService {
       final userDoc = await _firestore.collection('users').doc(currentUserId).get();
       final contacts = userDoc.data()?['contacts'] ?? [];
 
-      // Check if the contact already exists
       if (contacts.contains(contactId)) {
         throw Exception("This person is already in your contacts.");
       }
 
-      // Add the contact (store the contact ID, not the email)
+      // Add the contact
       await _firestore.collection('users').doc(currentUserId).update({
         'contacts': FieldValue.arrayUnion([contactId]),
       });
+
+      // Fetch contact details
+      final contactDoc = await _firestore.collection('users').doc(contactId).get();
+      final contactData = contactDoc.data();
+      final contactName = contactData?['name'] ?? 'Unknown';
+      final contactImage = contactData?['profilePicture'] ?? '';
+
+      // Add entry in conversations to make the contact appear in the home screen
+      await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .collection('conversations')
+          .doc(contactId)
+          .set({
+        'contactName': contactName,
+        'contactImage': contactImage,
+        'lastMessage': '',
+        'lastMessageTimestamp': FieldValue.serverTimestamp(),
+        'seen': true,
+      }, SetOptions(merge: true));
     } catch (e) {
-      throw e; // Re-throw error for UI handling
+      throw e;
     }
   }
 }
