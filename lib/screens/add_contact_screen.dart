@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'blocked_users_screen.dart';
 import '../services/add_contact_service.dart';
 
 class AddContactPage extends StatefulWidget {
@@ -45,24 +47,25 @@ class _AddContactPageState extends State<AddContactPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("Add Contact")),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _emailController,
-              decoration: InputDecoration(
-                labelText: "Email",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _addContact,
-              child: Text("Add Contact"),
-            ),
-          ],
-        ),
+      body: Column(
+        children: [
+          TextField(
+            controller: _emailController,
+            decoration: InputDecoration(labelText: "Email", border: OutlineInputBorder()),
+          ),
+          ElevatedButton(
+            onPressed: _addContact,
+            child: Text("Add Contact"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (context) => BlockedUsersScreen(currentUserId: widget.currentUserId),
+              ));
+            },
+            child: Text("Blocked Users"),
+          ),
+        ],
       ),
     );
   }

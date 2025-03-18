@@ -5,56 +5,52 @@ class ContactsService {
 
   Future<void> addContact(String currentUserId, String contactEmail) async {
     try {
-      // Check if user with this email exists
-      final querySnapshot = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: contactEmail)
-          .limit(1)
-          .get();
+      final firestore = FirebaseFirestore.instance;
 
+      // 🔥 Check if the user exists
+      final querySnapshot = await firestore.collection('users').where('email', isEqualTo: contactEmail).limit(1).get();
       if (querySnapshot.docs.isEmpty) {
         throw Exception("User with this email doesn't exist.");
       }
 
+      final contactData = querySnapshot.docs.first.data();
       final contactId = querySnapshot.docs.first.id;
+      final contactName = contactData['name'] ?? 'Unknown';  // 🔥 Ensure we get the name
+      final contactProfileImage = contactData['profilePicture'] ?? '';
+
       if (contactId == currentUserId) {
         throw Exception("You cannot add yourself as a contact.");
       }
 
-      // Get the user's contacts
-      final userDoc = await _firestore.collection('users').doc(currentUserId).get();
+      // 🔥 Check if the contact is already in the user's contacts
+      final userDoc = await firestore.collection('users').doc(currentUserId).get();
       final contacts = userDoc.data()?['contacts'] ?? [];
-
       if (contacts.contains(contactId)) {
         throw Exception("This person is already in your contacts.");
       }
 
-      // Add the contact
-      await _firestore.collection('users').doc(currentUserId).update({
-        'contacts': FieldValue.arrayUnion([contactId]),
+      // 🔥 Store the contact information correctly
+      await firestore.collection('users').doc(currentUserId).collection('conversations').doc(contactId).set({
+        "contactName": contactName,  // 🔥 Store the correct contact name
+        "contactImage": contactProfileImage,
+        "lastMessage": "Request Pending",
+        "lastMessageTimestamp": FieldValue.serverTimestamp(),
+        "accepted": false,
       });
 
-      // Fetch contact details
-      final contactDoc = await _firestore.collection('users').doc(contactId).get();
-      final contactData = contactDoc.data();
-      final contactName = contactData?['name'] ?? 'Unknown';
-      final contactImage = contactData?['profilePicture'] ?? '';
+      // 🔥 Send a request to the other person
+      await firestore.collection('users').doc(contactId).collection('conversations').doc(currentUserId).set({
+        "contactName": userDoc.data()?['name'] ?? 'Unknown',
+        "contactImage": userDoc.data()?['profilePicture'] ?? '',
+        "lastMessage": "Request Pending",
+        "lastMessageTimestamp": FieldValue.serverTimestamp(),
+        "accepted": false,
+      });
 
-      // Add entry in conversations to make the contact appear in the home screen
-      await _firestore
-          .collection('users')
-          .doc(currentUserId)
-          .collection('conversations')
-          .doc(contactId)
-          .set({
-        'contactName': contactName,
-        'contactImage': contactImage,
-        'lastMessage': '',
-        'lastMessageTimestamp': FieldValue.serverTimestamp(),
-        'seen': true,
-      }, SetOptions(merge: true));
     } catch (e) {
       throw e;
     }
   }
+
+
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/chat_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'message_request_dialog.dart';
 
 class ChatPage extends StatefulWidget {
   final String currentUserId;
@@ -23,12 +24,60 @@ class _ChatPageState extends State<ChatPage> {
   final ChatService _chatService = ChatService();
   final TextEditingController _messageController = TextEditingController();
   late String chatId;
+  bool isBlocked = false;
   int _selectedMessageIndex = -1;
 
   @override
   void initState() {
     super.initState();
     chatId = _chatService.getChatId(widget.currentUserId, widget.contactId);
+    _checkIfRequestExists();
+    _checkIfBlocked();
+    _markMessagesAsSeen();
+  }
+
+  // 🔥 Check if the user has a pending request
+  void _checkIfRequestExists() async {
+    final conversationRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.currentUserId)
+        .collection('conversations')
+        .doc(widget.contactId);
+
+    final doc = await conversationRef.get();
+
+    if (doc.exists && doc.data()!.containsKey('accepted') && doc['accepted'] == false) {
+      showDialog(
+        context: context,
+        builder: (context) => MessageRequestDialog(
+          currentUserId: widget.currentUserId,
+          contactId: widget.contactId,
+          contactName: widget.contactName,
+        ),
+      );
+    }
+  }
+
+  // 🔥 Check if the current user is blocked
+  void _checkIfBlocked() async {
+    final blockedRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.contactId) // Checking if the contact has blocked this user
+        .collection('blocked')
+        .doc(widget.currentUserId);
+
+    final doc = await blockedRef.get();
+
+    if (doc.exists) {
+      setState(() {
+        isBlocked = true; // 🔥 User is blocked
+      });
+    }
+  }
+
+  // ✅ Ensure all unseen messages are marked as seen when chat is opened
+  void _markMessagesAsSeen() async {
+    await _chatService.markMessagesAsSeen(chatId, widget.currentUserId);
   }
 
   void _sendMessage() async {
@@ -43,6 +92,17 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  String _formatSeenTimestamp(Timestamp? timestamp) {
+    if (timestamp == null) return "Recently";
+    final date = timestamp.toDate();
+    final now = DateTime.now();
+
+    if (date.year == now.year && date.month == now.month && date.day == now.day) {
+      return "at ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+    }
+    return "on ${date.day}/${date.month}/${date.year}";
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -51,80 +111,94 @@ class _ChatPageState extends State<ChatPage> {
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _chatService.getMessages(chatId),
+              stream: _chatService.getMessages(chatId, widget.currentUserId),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return Center(child: CircularProgressIndicator());
                 }
+
                 final messages = snapshot.data!.docs;
+                int lastSeenIndex = -1;
+
+                for (int i = messages.length - 1; i >= 0; i--) {
+                  var message = messages[i].data() as Map<String, dynamic>;
+                  if (message['seen'] == true && message['senderId'] == widget.currentUserId) {
+                    lastSeenIndex = i;
+                    break;
+                  }
+                }
+
                 return ListView.builder(
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final message = messages[index].data() as Map<String, dynamic>;
                     final isCurrentUser = message['senderId'] == widget.currentUserId;
-                    final timestamp = message['timestamp'] as Timestamp?;
+                    final seenTimestamp = message.containsKey('seenTimestamp') ? message['seenTimestamp'] as Timestamp? : null;
+                    final timestamp = message.containsKey('timestamp') ? message['timestamp'] as Timestamp? : null;
+
                     String formattedTime = timestamp != null
                         ? "${timestamp.toDate().hour}:${timestamp.toDate().minute.toString().padLeft(2, '0')}"
                         : "";
 
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedMessageIndex = (_selectedMessageIndex == index) ? -1 : index;
-                        });
-                      },
-                      child: Column(
-                        crossAxisAlignment:
-                        isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                            padding: EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: isCurrentUser ? Colors.blue : Colors.grey[300],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                    return Column(
+                      crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                          padding: EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isCurrentUser ? Colors.blue : Colors.grey[300],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            message['message'],
+                            style: TextStyle(color: isCurrentUser ? Colors.white : Colors.black),
+                          ),
+                        ),
+                        if (index == lastSeenIndex)
+                          Padding(
+                            padding: EdgeInsets.only(right: 10.0, top: 3),
                             child: Text(
-                              message['message'],
-                              style: TextStyle(color: isCurrentUser ? Colors.white : Colors.black),
+                              "Seen ${_formatSeenTimestamp(seenTimestamp)}",
+                              style: TextStyle(fontSize: 12, color: Colors.green),
                             ),
                           ),
-                          if (_selectedMessageIndex == index)
-                            Padding(
-                              padding: EdgeInsets.only(left: 10, right: 10),
-                              child: Text(
-                                formattedTime,
-                                style: TextStyle(fontSize: 12, color: Colors.grey),
-                              ),
-                            ),
-                        ],
-                      ),
+                      ],
                     );
                   },
                 );
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: InputDecoration(
-                      hintText: "Type your message...",
-                      border: OutlineInputBorder(),
+          if (!isBlocked) // 🔥 Hide message input if blocked
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: InputDecoration(
+                        hintText: "Type your message...",
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.send),
-                  onPressed: _sendMessage,
-                ),
-              ],
+                  IconButton(
+                    icon: Icon(Icons.send),
+                    onPressed: _sendMessage,
+                  ),
+                ],
+              ),
             ),
-          ),
+          if (isBlocked) // 🔥 Show message if user is blocked
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                "You have been blocked by this user.",
+                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+              ),
+            ),
         ],
       ),
     );

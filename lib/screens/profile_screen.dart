@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/profile_service.dart';
-import '../services/auth_service.dart'; // Add for sign out functionality
+import '../services/auth_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-
+import 'package:permission_handler/permission_handler.dart';
 import 'login.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -49,34 +49,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<bool> _requestStoragePermission() async {
+    var status = await Permission.photos.request();
+
+    if (status.isGranted) {
+      print("Storage permission granted.");
+      return true;
+    } else if (status.isPermanentlyDenied) {
+      print("Storage permission permanently denied.");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Permission denied. Enable it from app settings.')),
+      );
+      openAppSettings();
+      return false;
+    }
+    return false;
+  }
+
   Future<void> _pickImage() async {
+    bool hasPermission = await _requestStoragePermission();
+    if (!hasPermission) return;
+
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
     if (pickedFile != null) {
       setState(() {
         _pickedImage = File(pickedFile.path);
       });
 
-      final imageUrl = await _profileService.uploadProfileImage(
-          widget.currentUserId, _pickedImage!);
-      await _profileService.updateUserData(
-          widget.currentUserId, {'profileImage': imageUrl});
-      setState(() {
-        profileImageUrl = imageUrl;
-      });
+      try {
+        final imageUrl = await _profileService.uploadProfileImage(
+            widget.currentUserId, _pickedImage!);
+
+        await _profileService.updateUserData(widget.currentUserId, {'profileImage': imageUrl});
+
+        setState(() {
+          profileImageUrl = imageUrl;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Profile picture updated successfully!')),
+        );
+      } catch (e) {
+        print('Error updating profile picture: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload profile picture. Please try again.')),
+        );
+      }
     }
   }
 
   Future<void> _saveProfile() async {
     try {
-      await _profileService.updateUserData(
-        widget.currentUserId,
-        {'name': nameController.text},
-      );
+      await _profileService.updateUserData(widget.currentUserId, {'name': nameController.text});
+
       setState(() {
         name = nameController.text;
         isEditing = false;
       });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Profile updated successfully!')),
       );
@@ -127,7 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 radius: 70,
                 backgroundImage: _pickedImage != null
                     ? FileImage(_pickedImage!)
-                    : (profileImageUrl != null
+                    : (profileImageUrl != null && profileImageUrl!.isNotEmpty
                     ? NetworkImage(profileImageUrl!)
                     : AssetImage('assets/profile_pic.jpg'))
                 as ImageProvider,
