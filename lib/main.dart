@@ -6,8 +6,8 @@ import 'screens/login.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
- // FirestoreUtils firestoreUtils = FirestoreUtils();
- // await firestoreUtils.updateExistingMessages();
+ // FirebaseUpdater updater = FirebaseUpdater();
+ // await updater.updateFirebaseStructure();
   runApp(MyApp());
 }
 

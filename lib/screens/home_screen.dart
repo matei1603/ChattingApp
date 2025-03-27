@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'add_contact_screen.dart';
 import 'chat_screen.dart';
+import 'group_chat_screen.dart';
+import 'create_group_screen.dart';
 import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -34,85 +36,24 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _unblockUser(String contactId) async {
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.currentUserId)
-        .collection('blocked')
-        .doc(contactId)
-        .delete();
-
-    setState(() {
-      blockedUsers.remove(contactId);
-    });
-
-    // Restore conversation instantly
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(contactId).get();
-    if (userDoc.exists) {
-      final contactName = userDoc.data()?['name'] ?? 'Unknown';
-      final contactImage = userDoc.data()?['profilePicture'] ?? '';
-
-      // Restore conversation for the unblocking user
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.currentUserId)
-          .collection('conversations')
-          .doc(contactId)
-          .set({
-        'contactName': contactName,
-        'contactImage': contactImage,
-        'lastMessage': '',
-        'lastMessageTimestamp': FieldValue.serverTimestamp(),
-        'seen': true,
-        'accepted': true,
-      }, SetOptions(merge: true));
-
-      // Restore conversation for the unblocked user
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(contactId)
-          .collection('conversations')
-          .doc(widget.currentUserId)
-          .set({
-        'contactName': contactName,
-        'contactImage': contactImage,
-        'lastMessage': '',
-        'lastMessageTimestamp': FieldValue.serverTimestamp(),
-        'seen': false, // Mark as unread for the other user
-        'accepted': true,
-      }, SetOptions(merge: true));
-
-      // 🔄 Force UI update in real-time
-      setState(() {});
-    }
-  }
-  void _blockUser(String contactId) async {
-    // Add the contact to the blocked list in Firestore
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.currentUserId)
-        .collection('blocked')
-        .doc(contactId)
-        .set({'email': contactId});
-
-    setState(() {
-      blockedUsers.add(contactId);
-    });
-
-    // Remove conversation from home screen
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.currentUserId)
-        .collection('conversations')
-        .doc(contactId)
-        .delete();
-  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Messages"),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.group_add), // 🟢 Group chat creation icon
+            tooltip: "Create Group",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CreateGroupScreen(currentUserId: widget.currentUserId),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.account_circle),
             onPressed: () {
@@ -150,75 +91,57 @@ class _HomeScreenState extends State<HomeScreen> {
                 return SizedBox(); // Hide blocked users
               }
 
-              final data = conversation.data() as Map<String, dynamic>?; // Explicit casting
+              final data = conversation.data() as Map<String, dynamic>?;
+              final isGroup = data?['isGroup'] ?? false;
               final contactName = data?['contactName'] ?? 'Unknown';
               final contactImage = data?['contactImage'] ?? '';
               final lastMessage = data?['lastMessage'] ?? '';
               final lastMessageTimestamp = data?['lastMessageTimestamp'] as Timestamp?;
               final seen = data?['seen'] ?? true;
 
-              return GestureDetector(
-                onLongPress: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: Text("Block $contactName?"),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: Text("Cancel"),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            _blockUser(contactId);
-                            Navigator.pop(ctx);
-                          },
-                          child: Text("Block"),
-                        ),
-                      ],
+              return ListTile(
+                leading: CircleAvatar(
+                  radius: 24,
+                  backgroundImage: contactImage.isNotEmpty
+                      ? NetworkImage(contactImage)
+                      : const AssetImage('assets/profile_pic.jpg') as ImageProvider,
+                ),
+                title: Text(
+                  contactName,
+                  style: TextStyle(fontWeight: seen ? FontWeight.normal : FontWeight.bold),
+                ),
+                subtitle: Text(
+                  lastMessage.isNotEmpty ? lastMessage : "No messages yet",
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: TextStyle(color: seen ? Colors.black : Colors.blue),
+                ),
+                trailing: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      lastMessageTimestamp != null
+                          ? _formatTimestamp(lastMessageTimestamp)
+                          : "",
+                      style: const TextStyle(fontSize: 12),
                     ),
-                  );
-                },
-                child: ListTile(
-                  leading: CircleAvatar(
-                    radius: 24,
-                    backgroundImage: contactImage.isNotEmpty
-                        ? NetworkImage(contactImage)
-                        : const AssetImage('assets/profile_pic.jpg') as ImageProvider,
-                  ),
-                  title: Text(
-                    contactName,
-                    style: TextStyle(fontWeight: seen ? FontWeight.normal : FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    lastMessage.isNotEmpty ? lastMessage : "No messages yet",
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: TextStyle(color: seen ? Colors.black : Colors.blue),
-                  ),
-                  trailing: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        lastMessageTimestamp != null
-                            ? _formatTimestamp(lastMessageTimestamp)
-                            : "",
-                        style: const TextStyle(fontSize: 12),
+                    if (!seen)
+                      const Icon(Icons.circle, color: Colors.red, size: 10),
+                  ],
+                ),
+                onTap: () {
+                  if (isGroup) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => GroupChatScreen(
+                          groupId: contactId,
+                          currentUserId: widget.currentUserId,
+                        ),
                       ),
-                      if (!seen)
-                        const Icon(Icons.circle, color: Colors.red, size: 10),
-                    ],
-                  ),
-                  onTap: () {
-                    // Mark messages as seen
-                    FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(widget.currentUserId)
-                        .collection('conversations')
-                        .doc(contactId)
-                        .update({'seen': true});
-
+                    );
+                  } else {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -230,15 +153,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     );
-                  },
-                ),
+                  }
+                },
               );
             },
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.person_add),
+        tooltip: "Add Contact",
         onPressed: () {
           Navigator.push(
             context,

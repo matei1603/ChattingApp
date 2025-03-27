@@ -36,7 +36,6 @@ class _ChatPageState extends State<ChatPage> {
     _markMessagesAsSeen();
   }
 
-  // 🔥 Check if the user has a pending request
   void _checkIfRequestExists() async {
     final conversationRef = FirebaseFirestore.instance
         .collection('users')
@@ -46,7 +45,7 @@ class _ChatPageState extends State<ChatPage> {
 
     final doc = await conversationRef.get();
 
-    if (doc.exists && doc.data()!.containsKey('accepted') && doc['accepted'] == false) {
+    if (doc.exists && doc.data()?['accepted'] == false) {
       showDialog(
         context: context,
         builder: (context) => MessageRequestDialog(
@@ -58,11 +57,10 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  // 🔥 Check if the current user is blocked
   void _checkIfBlocked() async {
     final blockedRef = FirebaseFirestore.instance
         .collection('users')
-        .doc(widget.contactId) // Checking if the contact has blocked this user
+        .doc(widget.contactId)
         .collection('blocked')
         .doc(widget.currentUserId);
 
@@ -70,12 +68,11 @@ class _ChatPageState extends State<ChatPage> {
 
     if (doc.exists) {
       setState(() {
-        isBlocked = true; // 🔥 User is blocked
+        isBlocked = true;
       });
     }
   }
 
-  // ✅ Ensure all unseen messages are marked as seen when chat is opened
   void _markMessagesAsSeen() async {
     await _chatService.markMessagesAsSeen(chatId, widget.currentUserId);
   }
@@ -95,12 +92,7 @@ class _ChatPageState extends State<ChatPage> {
   String _formatSeenTimestamp(Timestamp? timestamp) {
     if (timestamp == null) return "Recently";
     final date = timestamp.toDate();
-    final now = DateTime.now();
-
-    if (date.year == now.year && date.month == now.month && date.day == now.day) {
-      return "at ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
-    }
-    return "on ${date.day}/${date.month}/${date.year}";
+    return "${date.hour}:${date.minute.toString().padLeft(2, '0')}";
   }
 
   @override
@@ -113,9 +105,7 @@ class _ChatPageState extends State<ChatPage> {
             child: StreamBuilder<QuerySnapshot>(
               stream: _chatService.getMessages(chatId, widget.currentUserId),
               builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return Center(child: CircularProgressIndicator());
-                }
+                if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
 
                 final messages = snapshot.data!.docs;
                 int lastSeenIndex = -1;
@@ -133,15 +123,12 @@ class _ChatPageState extends State<ChatPage> {
                   itemBuilder: (context, index) {
                     final message = messages[index].data() as Map<String, dynamic>;
                     final isCurrentUser = message['senderId'] == widget.currentUserId;
-                    final seenTimestamp = message.containsKey('seenTimestamp') ? message['seenTimestamp'] as Timestamp? : null;
-                    final timestamp = message.containsKey('timestamp') ? message['timestamp'] as Timestamp? : null;
-
-                    String formattedTime = timestamp != null
-                        ? "${timestamp.toDate().hour}:${timestamp.toDate().minute.toString().padLeft(2, '0')}"
-                        : "";
+                    final timestamp = message['timestamp'] as Timestamp?;
+                    final seenTimestamp = message['seenTimestamp'] as Timestamp?;
 
                     return Column(
-                      crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      crossAxisAlignment:
+                      isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                       children: [
                         Container(
                           margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
@@ -157,7 +144,7 @@ class _ChatPageState extends State<ChatPage> {
                         ),
                         if (index == lastSeenIndex)
                           Padding(
-                            padding: EdgeInsets.only(right: 10.0, top: 3),
+                            padding: EdgeInsets.only(right: 10.0),
                             child: Text(
                               "Seen ${_formatSeenTimestamp(seenTimestamp)}",
                               style: TextStyle(fontSize: 12, color: Colors.green),
@@ -170,7 +157,7 @@ class _ChatPageState extends State<ChatPage> {
               },
             ),
           ),
-          if (!isBlocked) // 🔥 Hide message input if blocked
+          if (!isBlocked)
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Row(
@@ -191,7 +178,7 @@ class _ChatPageState extends State<ChatPage> {
                 ],
               ),
             ),
-          if (isBlocked) // 🔥 Show message if user is blocked
+          if (isBlocked)
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Text(
