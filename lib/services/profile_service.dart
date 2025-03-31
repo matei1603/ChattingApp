@@ -71,17 +71,17 @@ class ProfileService {
 
       TaskSnapshot snapshot = await uploadTask;
 
-      // 🔥 Get the download URL as a String
+      //  Get the download URL as a String
       final String imageUrl = await snapshot.ref.getDownloadURL();
 
-      // 🔥 Update Firestore profile with the String URL
+      //  Update Firestore profile with the String URL
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
-        'profileImage': imageUrl, // ✅ Ensuring it's stored as String
+        'profileImage': imageUrl, //  Ensuring it's stored as String
       });
 
-      return imageUrl; // ✅ Return the String URL
+      return imageUrl; //  Return the String URL
     } catch (e) {
-      print('🔥 Error uploading profile image: $e');
+      print(' Error uploading profile image: $e');
       throw Exception('Failed to upload profile image.');
     }
   }

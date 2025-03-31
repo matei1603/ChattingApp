@@ -15,7 +15,7 @@ class ContactsService {
 
       final contactData = querySnapshot.docs.first.data();
       final contactId = querySnapshot.docs.first.id;
-      final contactName = contactData['name'] ?? 'Unknown';  // 🔥 Ensure we get the name
+      final contactName = contactData['name'] ?? 'Unknown';  //  Ensure we get the name
       final contactProfileImage = contactData['profilePicture'] ?? '';
 
       if (contactId == currentUserId) {
@@ -31,20 +31,21 @@ class ContactsService {
 
       // 🔥 Store the contact information correctly
       await firestore.collection('users').doc(currentUserId).collection('conversations').doc(contactId).set({
-        "contactName": contactName,  // 🔥 Store the correct contact name
+        "contactName": contactName,  //  Store the correct contact name
         "contactImage": contactProfileImage,
         "lastMessage": "Request Pending",
         "lastMessageTimestamp": FieldValue.serverTimestamp(),
         "accepted": false,
       });
 
-      // 🔥 Send a request to the other person
+// 🔥 Send a request to the other person (receiver = contactId)
       await firestore.collection('users').doc(contactId).collection('conversations').doc(currentUserId).set({
         "contactName": userDoc.data()?['name'] ?? 'Unknown',
         "contactImage": userDoc.data()?['profilePicture'] ?? '',
         "lastMessage": "Request Pending",
         "lastMessageTimestamp": FieldValue.serverTimestamp(),
         "accepted": false,
+        "requestReceiver": contactId,
       });
 
     } catch (e) {

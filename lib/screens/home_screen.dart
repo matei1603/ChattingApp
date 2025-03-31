@@ -17,11 +17,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<String> blockedUsers = [];
+  Map<String, Timestamp> deletedConversations = {};
 
   @override
   void initState() {
     super.initState();
     _fetchBlockedUsers();
+    _fetchDeletedConversations();
   }
 
   void _fetchBlockedUsers() async {
@@ -36,6 +38,21 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _fetchDeletedConversations() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.currentUserId)
+        .collection('deletedConversations')
+        .get();
+
+    setState(() {
+      deletedConversations = {
+        for (var doc in snapshot.docs)
+          doc.id: doc['deletedAt'] as Timestamp
+      };
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -43,13 +60,14 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text("Messages"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.group_add), // 🟢 Group chat creation icon
+            icon: const Icon(Icons.group_add),
             tooltip: "Create Group",
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => CreateGroupScreen(currentUserId: widget.currentUserId),
+                  builder: (context) =>
+                      CreateGroupScreen(currentUserId: widget.currentUserId),
                 ),
               );
             },
@@ -60,7 +78,8 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ProfileScreen(currentUserId: widget.currentUserId),
+                  builder: (context) =>
+                      ProfileScreen(currentUserId: widget.currentUserId),
                 ),
               );
             },
@@ -87,34 +106,45 @@ class _HomeScreenState extends State<HomeScreen> {
               final conversation = conversations[index];
               final contactId = conversation.id;
 
-              if (blockedUsers.contains(contactId)) {
-                return SizedBox(); // Hide blocked users
-              }
+              if (blockedUsers.contains(contactId)) return SizedBox();
 
               final data = conversation.data() as Map<String, dynamic>?;
               final isGroup = data?['isGroup'] ?? false;
               final contactName = data?['contactName'] ?? 'Unknown';
               final contactImage = data?['contactImage'] ?? '';
               final lastMessage = data?['lastMessage'] ?? '';
-              final lastMessageTimestamp = data?['lastMessageTimestamp'] as Timestamp?;
+              final lastMessageTimestamp =
+              data?['lastMessageTimestamp'] as Timestamp?;
               final seen = data?['seen'] ?? true;
+
+              // ✅ Hide deleted conversation unless a new message is received
+              final deletedAt = deletedConversations[contactId];
+              if (deletedAt != null &&
+                  (lastMessageTimestamp == null ||
+                      !lastMessageTimestamp.toDate().isAfter(deletedAt.toDate()))) {
+                return SizedBox();
+              }
 
               return ListTile(
                 leading: CircleAvatar(
                   radius: 24,
                   backgroundImage: contactImage.isNotEmpty
                       ? NetworkImage(contactImage)
-                      : const AssetImage('assets/profile_pic.jpg') as ImageProvider,
+                      : const AssetImage('assets/profile_pic.jpg')
+                  as ImageProvider,
                 ),
                 title: Text(
                   contactName,
-                  style: TextStyle(fontWeight: seen ? FontWeight.normal : FontWeight.bold),
+                  style: TextStyle(
+                      fontWeight:
+                      seen ? FontWeight.normal : FontWeight.bold),
                 ),
                 subtitle: Text(
                   lastMessage.isNotEmpty ? lastMessage : "No messages yet",
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
-                  style: TextStyle(color: seen ? Colors.black : Colors.blue),
+                  style: TextStyle(
+                      color: seen ? Colors.black : Colors.blue),
                 ),
                 trailing: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -127,7 +157,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: const TextStyle(fontSize: 12),
                     ),
                     if (!seen)
-                      const Icon(Icons.circle, color: Colors.red, size: 10),
+                      const Icon(Icons.circle,
+                          color: Colors.red, size: 10),
                   ],
                 ),
                 onTap: () {
@@ -155,6 +186,38 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   }
                 },
+                onLongPress: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text("Delete conversation?"),
+                      content: Text(
+                          "This will hide the conversation from your home screen. You’ll see it again if someone sends a new message."),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: Text("Cancel"),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: Text("Delete"),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true) {
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(widget.currentUserId)
+                        .collection('deletedConversations')
+                        .doc(contactId)
+                        .set({
+                      'deletedAt': Timestamp.now(),
+                    });
+                    _fetchDeletedConversations(); // Refresh
+                  }
+                },
               );
             },
           );
@@ -167,7 +230,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => AddContactPage(currentUserId: widget.currentUserId),
+              builder: (context) =>
+                  AddContactPage(currentUserId: widget.currentUserId),
             ),
           );
         },
@@ -179,7 +243,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final date = timestamp.toDate();
     final now = DateTime.now();
 
-    if (date.year == now.year && date.month == now.month && date.day == now.day) {
+    if (date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day) {
       return "${date.hour}:${date.minute.toString().padLeft(2, '0')}";
     }
 

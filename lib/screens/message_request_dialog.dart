@@ -17,7 +17,7 @@ class MessageRequestDialog extends StatelessWidget {
     try {
       final firestore = FirebaseFirestore.instance;
 
-      // ✅ Mark conversation as accepted
+      //  Mark conversation as accepted
       await firestore
           .collection('users')
           .doc(currentUserId)
@@ -25,7 +25,7 @@ class MessageRequestDialog extends StatelessWidget {
           .doc(contactId)
           .update({'accepted': true});
 
-      // ✅ Add the contact to both users' contact lists
+      //  Add the contact to both users' contact lists
       await firestore.collection('users').doc(currentUserId).update({
         'contacts': FieldValue.arrayUnion([contactId])
       });
@@ -34,7 +34,7 @@ class MessageRequestDialog extends StatelessWidget {
         'contacts': FieldValue.arrayUnion([currentUserId])
       });
 
-      Navigator.pop(context); // ✅ Close the dialog
+      Navigator.pop(context); //  Close the dialog
     } catch (e) {
       print("Error accepting request: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -47,7 +47,7 @@ class MessageRequestDialog extends StatelessWidget {
     try {
       final firestore = FirebaseFirestore.instance;
 
-      // ✅ Add the blocked user to the blocked list
+      //  Add the blocked user to the blocked list
       await firestore
           .collection('users')
           .doc(currentUserId)
@@ -55,7 +55,7 @@ class MessageRequestDialog extends StatelessWidget {
           .doc(contactId)
           .set({'blockedAt': FieldValue.serverTimestamp()});
 
-      // ✅ Remove the conversation request
+      // Remove the conversation request
       await firestore
           .collection('users')
           .doc(currentUserId)
@@ -63,7 +63,7 @@ class MessageRequestDialog extends StatelessWidget {
           .doc(contactId)
           .delete();
 
-      Navigator.pop(context); // ✅ Close the dialog
+      Navigator.pop(context); //  Close the dialog
     } catch (e) {
       print("Error blocking user: $e");
       ScaffoldMessenger.of(context).showSnackBar(

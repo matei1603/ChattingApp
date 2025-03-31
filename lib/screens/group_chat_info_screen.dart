@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/group_chat_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class GroupChatInfoScreen extends StatefulWidget {
   final String groupId;
@@ -71,6 +72,51 @@ class _GroupChatInfoScreenState extends State<GroupChatInfoScreen> {
     Navigator.pop(context);
   }
 
+  Future<void> _leaveGroup() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("Leave Group"),
+        content: Text("Are you sure you want to leave this group?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text("Cancel")),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: Text("Leave")),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(widget.groupId)
+          .update({
+        'members': FieldValue.arrayRemove([widget.currentUserId]),
+      });
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.currentUserId)
+          .collection('conversations')
+          .doc(widget.groupId)
+          .delete();
+
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(widget.groupId)
+          .collection('messages')
+          .add({
+        'senderId': 'system',
+        'message': 'Someone left the group',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        Navigator.pop(context); // Close info screen
+        Navigator.pop(context); // Go back from chat screen
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -87,7 +133,7 @@ class _GroupChatInfoScreenState extends State<GroupChatInfoScreen> {
                     ? FileImage(_newImageFile!)
                     : (_groupImageUrl != null && _groupImageUrl!.isNotEmpty
                     ? NetworkImage(_groupImageUrl!)
-                    : const AssetImage('assets/group_default.jpg') as ImageProvider),
+                    : const AssetImage('assets/group_default.jpg')) as ImageProvider,
               ),
             ),
             const SizedBox(height: 20),
@@ -99,6 +145,12 @@ class _GroupChatInfoScreenState extends State<GroupChatInfoScreen> {
             ElevatedButton(
               onPressed: _saveChanges,
               child: Text("Save Changes"),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: _leaveGroup,
+              child: Text("Leave Group"),
             ),
           ],
         ),

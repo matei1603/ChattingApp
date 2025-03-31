@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/group_chat_service.dart';
 import 'group_chat_info_screen.dart';
 import 'add_people_to_group_screen.dart';
@@ -23,6 +25,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   final GroupChatService _groupChatService = GroupChatService();
   final TextEditingController _messageController = TextEditingController();
   Map<String, dynamic>? groupData;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -39,7 +42,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
-  void _sendMessage() async {
+  void _sendTextMessage() async {
     final message = _messageController.text.trim();
     if (message.isNotEmpty) {
       await _groupChatService.sendMessage(
@@ -48,6 +51,22 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         message,
       );
       _messageController.clear();
+    }
+  }
+
+  void _sendImageMessage(File imageFile) async {
+    await _groupChatService.sendImageMessage(
+      widget.groupId,
+      widget.currentUserId,
+      imageFile,
+    );
+  }
+
+  Future<void> _pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      File image = File(pickedFile.path);
+      _sendImageMessage(image);
     }
   }
 
@@ -73,6 +92,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   Widget _buildMessageTile(Map<String, dynamic> message, bool isCurrentUser, String messageId) {
     final senderId = message['senderId'];
     final text = message['message'] ?? '';
+    final imageUrl = message['imageUrl'] ?? null;
     final isSystem = senderId == 'system';
 
     return FutureBuilder<String>(
@@ -93,9 +113,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         }
 
         return GestureDetector(
-          onLongPress: isCurrentUser
-              ? () => _showSeenByDialog(messageId)
-              : null,
+          onLongPress: isCurrentUser ? () => _showSeenByDialog(messageId) : null,
           child: Column(
             crossAxisAlignment:
             isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -118,7 +136,16 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                   color: isCurrentUser ? Colors.blue : Colors.grey[300],
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(
+                child: imageUrl != null
+                    ? ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    imageUrl,
+                    width: 200,
+                    fit: BoxFit.cover,
+                  ),
+                )
+                    : Text(
                   text,
                   style: TextStyle(color: isCurrentUser ? Colors.white : Colors.black),
                 ),
@@ -194,6 +221,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Row(
               children: [
+                IconButton(
+                  icon: Icon(Icons.image),
+                  onPressed: _pickImage,
+                ),
                 Expanded(
                   child: TextField(
                     controller: _messageController,
@@ -205,7 +236,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 ),
                 IconButton(
                   icon: Icon(Icons.send),
-                  onPressed: _sendMessage,
+                  onPressed: _sendTextMessage,
                 ),
               ],
             ),

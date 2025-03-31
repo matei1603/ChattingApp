@@ -34,7 +34,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
                 final conversations = snapshot.data!.docs;
 
-                // ✅ Filter to show only individual contacts (not group chats)
+                //  Filter to show only individual contacts (not group chats)
                 final filteredContacts = conversations.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
                   final isGroup = data['group'] == true || data['isGroup'] == true;
