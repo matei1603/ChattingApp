@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import '../services/crypto_service.dart';
 import '../services/group_chat_service.dart';
 import 'group_chat_info_screen.dart';
 import 'add_people_to_group_screen.dart';
@@ -22,6 +23,7 @@ class GroupChatScreen extends StatefulWidget {
 }
 
 class _GroupChatScreenState extends State<GroupChatScreen> {
+  final ScrollController _scrollController = ScrollController();
   final GroupChatService _groupChatService = GroupChatService();
   final TextEditingController _messageController = TextEditingController();
   Map<String, dynamic>? groupData;
@@ -91,9 +93,16 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   Widget _buildMessageTile(Map<String, dynamic> message, bool isCurrentUser, String messageId) {
     final senderId = message['senderId'];
-    final text = message['message'] ?? '';
-    final imageUrl = message['imageUrl'] ?? null;
     final isSystem = senderId == 'system';
+
+    final text = message['message'] != null && message['message'] != ''
+        ? CryptoService.decryptText(message['message'])
+        : '';
+
+    final encryptedUrl = message['imageUrl'];
+    final imageUrl = encryptedUrl != null && encryptedUrl != ''
+        ? CryptoService.decryptText(encryptedUrl)
+        : null;
 
     return FutureBuilder<String>(
       future: _getUserName(senderId),
@@ -115,18 +124,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         return GestureDetector(
           onLongPress: isCurrentUser ? () => _showSeenByDialog(messageId) : null,
           child: Column(
-            crossAxisAlignment:
-            isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
               if (!isCurrentUser)
                 Padding(
                   padding: const EdgeInsets.only(left: 10, bottom: 2),
                   child: Text(
                     senderName,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey[700]),
                   ),
                 ),
               Container(
@@ -205,7 +210,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
                 final messages = snapshot.data!.docs;
 
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_scrollController.hasClients) {
+                    _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                  }
+                });
+
                 return ListView.builder(
+                  controller: _scrollController,
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msgDoc = messages[index];

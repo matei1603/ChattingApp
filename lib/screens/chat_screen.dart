@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/chat_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/crypto_service.dart';
 import 'message_request_dialog.dart';
 
 class ChatPage extends StatefulWidget {
@@ -24,6 +25,7 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final ChatService _chatService = ChatService();
+  final ScrollController _scrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
   late String chatId;
   bool isBlocked = false;
@@ -89,6 +91,38 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  void _toggleBlockStatus(BuildContext context) async {
+    final action = isBlocked ? "Unblock" : "Block";
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("$action ${widget.contactName}?"),
+        content: Text("Are you sure you want to $action this user?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(action)),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final blockRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.contactId)
+        .collection('blocked')
+        .doc(widget.currentUserId);
+
+    if (isBlocked) {
+      await blockRef.delete();
+      setState(() => isBlocked = false);
+    } else {
+      await blockRef.set({'blockedAt': FieldValue.serverTimestamp()});
+      setState(() => isBlocked = true);
+    }
+  }
+
   void _markMessagesAsSeen() async {
     await _chatService.markMessagesAsSeen(chatId, widget.currentUserId);
   }
@@ -135,7 +169,16 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.contactName)),
+      appBar: AppBar(
+        title: Text(widget.contactName),
+        actions: [
+          IconButton(
+            icon: Icon(isBlocked ? Icons.lock_open : Icons.block),
+            tooltip: isBlocked ? "Unblock" : "Block",
+            onPressed: () => _toggleBlockStatus(context),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -152,6 +195,12 @@ class _ChatPageState extends State<ChatPage> {
                   return deletedAt == null || (ts != null && ts.toDate().isAfter(deletedAt!.toDate()));
                 }).toList();
 
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_scrollController.hasClients) {
+                    _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                  }
+                });
+
                 int lastSeenIndex = -1;
                 for (int i = messages.length - 1; i >= 0; i--) {
                   var data = messages[i].data() as Map<String, dynamic>;
@@ -162,13 +211,19 @@ class _ChatPageState extends State<ChatPage> {
                 }
 
                 return ListView.builder(
+                  controller: _scrollController,
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final data = messages[index].data() as Map<String, dynamic>;
                     final isCurrentUser = data['senderId'] == widget.currentUserId;
                     final seenTimestamp = data['seenTimestamp'] as Timestamp?;
-                    final imageUrl = data['imageUrl'];
-                    final text = data['message'];
+                    final encryptedImageUrl = data['imageUrl'];
+                    final imageUrl = encryptedImageUrl != null && encryptedImageUrl != ''
+                        ? CryptoService.decryptText(encryptedImageUrl)
+                        : null;
+                    final text = data['message'] != null && data['message'] != ''
+                        ? CryptoService.decryptText(data['message'])
+                        : '';
 
                     return Column(
                       crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -183,7 +238,7 @@ class _ChatPageState extends State<ChatPage> {
                           child: imageUrl != null && imageUrl != ''
                               ? Image.network(imageUrl, height: 200)
                               : Text(
-                            text ?? '',
+                            text,
                             style: TextStyle(
                               color: isCurrentUser ? Colors.white : Colors.black,
                             ),

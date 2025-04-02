@@ -1,5 +1,8 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/crypto_service.dart';
+import '../services/notifications_service.dart';
 import 'add_contact_screen.dart';
 import 'chat_screen.dart';
 import 'group_chat_screen.dart';
@@ -24,6 +27,12 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _fetchBlockedUsers();
     _fetchDeletedConversations();
+   // NotificationService.initialize(context);
+    //FirebaseMessaging.onMessage.listen(NotificationService.display);
+
+    // FirebaseMessaging.onMessageOpenedApp.listen((message) {
+    //   print(" App opened via notification");
+    // });
   }
 
   void _fetchBlockedUsers() async {
@@ -117,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
               data?['lastMessageTimestamp'] as Timestamp?;
               final seen = data?['seen'] ?? true;
 
-              // ✅ Hide deleted conversation unless a new message is received
+              //  Hide deleted conversation unless a new message is received
               final deletedAt = deletedConversations[contactId];
               if (deletedAt != null &&
                   (lastMessageTimestamp == null ||
@@ -140,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       seen ? FontWeight.normal : FontWeight.bold),
                 ),
                 subtitle: Text(
-                  lastMessage.isNotEmpty ? lastMessage : "No messages yet",
+                  lastMessage.isNotEmpty ? CryptoService.decryptText(lastMessage) : "No messages yet",
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                   style: TextStyle(
