@@ -2,8 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/chat_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/crypto_service.dart';
+import '../services/location_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'message_request_dialog.dart';
 
 class ChatPage extends StatefulWidget {
@@ -30,12 +31,29 @@ class _ChatPageState extends State<ChatPage> {
   late String chatId;
   bool isBlocked = false;
   Timestamp? deletedAt;
+  Map<String, dynamic>? currentUserData;
+
+  String _visibility = 'public';
+  final Map<String, String> visibilityEmoji = {
+    'public': '🌍',
+    'home': '🏠',
+    'work': '💼',
+  };
+
+  void _toggleVisibility() {
+    setState(() {
+      if (_visibility == 'public') _visibility = 'home';
+      else if (_visibility == 'home') _visibility = 'work';
+      else _visibility = 'public';
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     chatId = _chatService.getChatId(widget.currentUserId, widget.contactId);
     _loadDeletedAt();
+    _loadCurrentUserData();
     _checkIfRequestExists();
     _checkIfBlocked();
     _markMessagesAsSeen();
@@ -52,6 +70,15 @@ class _ChatPageState extends State<ChatPage> {
     if (deletedDoc.exists) {
       setState(() {
         deletedAt = deletedDoc['deletedAt'];
+      });
+    }
+  }
+
+  void _loadCurrentUserData() async {
+    final doc = await FirebaseFirestore.instance.collection('users').doc(widget.currentUserId).get();
+    if (doc.exists) {
+      setState(() {
+        currentUserData = doc.data();
       });
     }
   }
@@ -130,7 +157,13 @@ class _ChatPageState extends State<ChatPage> {
   void _sendMessage() async {
     final msg = _messageController.text.trim();
     if (msg.isNotEmpty) {
-      await _chatService.sendMessage(chatId, widget.currentUserId, widget.contactId, msg);
+      await _chatService.sendMessage(
+        chatId,
+        widget.currentUserId,
+        widget.contactId,
+        msg,
+        visibility: _visibility,
+      );
       _messageController.clear();
 
       await FirebaseFirestore.instance
@@ -148,7 +181,13 @@ class _ChatPageState extends State<ChatPage> {
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
       final imageFile = File(picked.path);
-      await _chatService.sendImageMessage(chatId, widget.currentUserId, widget.contactId, imageFile);
+      await _chatService.sendImageMessage(
+        chatId,
+        widget.currentUserId,
+        widget.contactId,
+        imageFile,
+        visibility: _visibility,
+      );
 
       await FirebaseFirestore.instance
           .collection('users')
@@ -164,6 +203,36 @@ class _ChatPageState extends State<ChatPage> {
     if (timestamp == null) return "Recently";
     final date = timestamp.toDate();
     return "${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+  }
+
+  Future<List<Map<String, dynamic>>> _filterMessages(List<QueryDocumentSnapshot> allMessages) async {
+    if (currentUserData == null) return [];
+
+    List<Map<String, dynamic>> filtered = [];
+
+    for (final doc in allMessages) {
+      final data = doc.data() as Map<String, dynamic>;
+      final ts = data['timestamp'] as Timestamp?;
+      final visibility = data['visibility'] ?? 'public';
+      final isNotDeleted = deletedAt == null || (ts != null && ts.toDate().isAfter(deletedAt!.toDate()));
+
+      if (!isNotDeleted) continue;
+
+      final shouldShow = await LocationService.shouldShowMessage(
+        currentUserId: widget.currentUserId,
+        senderId: data['senderId'],
+        locationType: visibility,
+        currentUserData: currentUserData,
+      );
+
+      if (shouldShow || data['senderId'] == widget.currentUserId || visibility == 'public') {
+        filtered.add({'data': data, 'restricted': false});
+      } else {
+        filtered.add({'data': data, 'restricted': true});
+      }
+    }
+
+    return filtered;
   }
 
   @override
@@ -186,73 +255,100 @@ class _ChatPageState extends State<ChatPage> {
               stream: _chatService.getMessages(chatId, widget.currentUserId),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
-
                 final allMessages = snapshot.data!.docs;
 
-                final messages = allMessages.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final ts = data['timestamp'] as Timestamp?;
-                  return deletedAt == null || (ts != null && ts.toDate().isAfter(deletedAt!.toDate()));
-                }).toList();
+                return FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _filterMessages(allMessages),
+                  builder: (context, filteredSnapshot) {
+                    if (!filteredSnapshot.hasData) return Center(child: CircularProgressIndicator());
+                    final messages = filteredSnapshot.data!;
 
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollController.hasClients) {
-                    _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-                  }
-                });
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (_scrollController.hasClients) {
+                        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                      }
+                    });
 
-                int lastSeenIndex = -1;
-                for (int i = messages.length - 1; i >= 0; i--) {
-                  var data = messages[i].data() as Map<String, dynamic>;
-                  if (data['seen'] == true && data['senderId'] == widget.currentUserId) {
-                    lastSeenIndex = i;
-                    break;
-                  }
-                }
+                    int lastSeenIndex = -1;
+                    for (int i = messages.length - 1; i >= 0; i--) {
+                      var data = messages[i]['data'] as Map<String, dynamic>;
+                      if (data['seen'] == true && data['senderId'] == widget.currentUserId) {
+                        lastSeenIndex = i;
+                        break;
+                      }
+                    }
 
-                return ListView.builder(
-                  controller: _scrollController,
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final data = messages[index].data() as Map<String, dynamic>;
-                    final isCurrentUser = data['senderId'] == widget.currentUserId;
-                    final seenTimestamp = data['seenTimestamp'] as Timestamp?;
-                    final encryptedImageUrl = data['imageUrl'];
-                    final imageUrl = encryptedImageUrl != null && encryptedImageUrl != ''
-                        ? CryptoService.decryptText(encryptedImageUrl)
-                        : null;
-                    final text = data['message'] != null && data['message'] != ''
-                        ? CryptoService.decryptText(data['message'])
-                        : '';
+                    return ListView.builder(
+                      controller: _scrollController,
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final data = messages[index]['data'] as Map<String, dynamic>;
+                        final restricted = messages[index]['restricted'] as bool;
+                        final isCurrentUser = data['senderId'] == widget.currentUserId;
+                        final visibility = data['visibility'] ?? 'public';
+                        final seenTimestamp = data['seenTimestamp'] as Timestamp?;
 
-                    return Column(
-                      crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: isCurrentUser ? Colors.blue : Colors.grey[300],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: imageUrl != null && imageUrl != ''
-                              ? Image.network(imageUrl, height: 200)
-                              : Text(
-                            text,
-                            style: TextStyle(
-                              color: isCurrentUser ? Colors.white : Colors.black,
-                            ),
-                          ),
-                        ),
-                        if (index == lastSeenIndex)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 10.0),
+                        if (restricted) {
+                          final msg = visibility == 'home'
+                              ? "You can see this message when you are home"
+                              : "You can see this message when you are at work";
+                          return Padding(
+                            padding: const EdgeInsets.all(10),
                             child: Text(
-                              "Seen ${_formatSeenTimestamp(seenTimestamp)}",
-                              style: const TextStyle(fontSize: 12, color: Colors.green),
+                              msg,
+                              style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
                             ),
-                          ),
-                      ],
+                          );
+                        }
+
+                        final encryptedImageUrl = data['imageUrl'];
+                        final imageUrl = encryptedImageUrl != null && encryptedImageUrl != ''
+                            ? CryptoService.decryptText(encryptedImageUrl)
+                            : null;
+                        final text = data['message'] != null && data['message'] != ''
+                            ? CryptoService.decryptText(data['message'])
+                            : '';
+
+                        return Column(
+                          crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: isCurrentUser ? Colors.blue : Colors.grey[300],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (imageUrl != null)
+                                    Image.network(imageUrl, height: 200),
+                                  if (text.isNotEmpty)
+                                    Text(
+                                      text,
+                                      style: TextStyle(
+                                        color: isCurrentUser ? Colors.white : Colors.black,
+                                      ),
+                                    ),
+                                  Text(
+                                    visibilityEmoji[visibility] ?? '',
+                                    style: TextStyle(fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (index == lastSeenIndex)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 10.0),
+                                child: Text(
+                                  "Seen ${_formatSeenTimestamp(seenTimestamp)}",
+                                  style: const TextStyle(fontSize: 12, color: Colors.green),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     );
                   },
                 );
@@ -264,6 +360,16 @@ class _ChatPageState extends State<ChatPage> {
               padding: const EdgeInsets.all(8.0),
               child: Row(
                 children: [
+                  GestureDetector(
+                    onTap: _toggleVisibility,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text(
+                        visibilityEmoji[_visibility]!,
+                        style: TextStyle(fontSize: 24),
+                      ),
+                    ),
+                  ),
                   IconButton(
                     icon: Icon(Icons.image),
                     onPressed: _sendImageMessage,

@@ -1,8 +1,7 @@
-import 'package:chatting_app/services/crypto_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-
+import 'package:chatting_app/services/crypto_service.dart';
 
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -13,7 +12,13 @@ class ChatService {
         : "$contactId-$userId";
   }
 
-  Future<void> sendMessage(String chatId, String senderId, String receiverId, String message) async {
+  Future<void> sendMessage(
+      String chatId,
+      String senderId,
+      String receiverId,
+      String message, {
+        String visibility = 'public',
+      }) async {
     final encryptedMessage = CryptoService.encrypt(message);
 
     final chatRef = _firestore.collection('chats').doc(chatId);
@@ -27,13 +32,20 @@ class ChatService {
       'timestamp': FieldValue.serverTimestamp(),
       'seen': false,
       'seenTimestamp': null,
+      'visibility': visibility,
     });
 
     await _updateConversations(senderId, receiverId, encryptedMessage);
     await _removeDeletedFlag(receiverId, chatId);
   }
 
-  Future<void> sendImageMessage(String chatId, String senderId, String receiverId, File imageFile) async {
+  Future<void> sendImageMessage(
+      String chatId,
+      String senderId,
+      String receiverId,
+      File imageFile, {
+        String visibility = 'public',
+      }) async {
     final chatRef = _firestore.collection('chats').doc(chatId);
     final messagesRef = chatRef.collection('messages');
 
@@ -48,6 +60,7 @@ class ChatService {
       'timestamp': FieldValue.serverTimestamp(),
       'seen': false,
       'seenTimestamp': null,
+      'visibility': visibility,
     });
 
     final preview = CryptoService.encrypt('[Image]');
@@ -63,7 +76,11 @@ class ChatService {
     return await storageRef.getDownloadURL();
   }
 
-  Future<void> _updateConversations(String senderId, String receiverId, String encryptedLastMessage) async {
+  Future<void> _updateConversations(
+      String senderId,
+      String receiverId,
+      String encryptedLastMessage,
+      ) async {
     final senderDoc = await _firestore.collection('users').doc(senderId).get();
     final receiverDoc = await _firestore.collection('users').doc(receiverId).get();
 
@@ -72,7 +89,12 @@ class ChatService {
     final receiverName = receiverDoc.data()?['name'] ?? 'Unknown';
     final receiverImage = receiverDoc.data()?['profilePicture'] ?? '';
 
-    await _firestore.collection('users').doc(senderId).collection('conversations').doc(receiverId).set({
+    await _firestore
+        .collection('users')
+        .doc(senderId)
+        .collection('conversations')
+        .doc(receiverId)
+        .set({
       "lastMessage": encryptedLastMessage,
       "lastMessageTimestamp": FieldValue.serverTimestamp(),
       "seen": true,
@@ -80,7 +102,12 @@ class ChatService {
       "contactImage": receiverImage,
     }, SetOptions(merge: true));
 
-    await _firestore.collection('users').doc(receiverId).collection('conversations').doc(senderId).set({
+    await _firestore
+        .collection('users')
+        .doc(receiverId)
+        .collection('conversations')
+        .doc(senderId)
+        .set({
       "lastMessage": encryptedLastMessage,
       "lastMessageTimestamp": FieldValue.serverTimestamp(),
       "seen": false,
@@ -108,7 +135,8 @@ class ChatService {
   Stream<QuerySnapshot> getMessages(String chatId, String currentUserId) {
     final chatRef = _firestore.collection('chats').doc(chatId);
 
-    return chatRef.collection('messages')
+    return chatRef
+        .collection('messages')
         .orderBy('timestamp', descending: false)
         .snapshots()
         .map((querySnapshot) {

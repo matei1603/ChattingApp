@@ -25,6 +25,7 @@ void main() async {
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   // await NotificationService.display(message);
+
 }
 class MyApp extends StatelessWidget {
   @override

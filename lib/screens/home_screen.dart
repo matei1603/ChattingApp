@@ -27,12 +27,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _fetchBlockedUsers();
     _fetchDeletedConversations();
-   // NotificationService.initialize(context);
-    //FirebaseMessaging.onMessage.listen(NotificationService.display);
-
-    // FirebaseMessaging.onMessageOpenedApp.listen((message) {
-    //   print(" App opened via notification");
-    // });
   }
 
   void _fetchBlockedUsers() async {
@@ -56,8 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       deletedConversations = {
-        for (var doc in snapshot.docs)
-          doc.id: doc['deletedAt'] as Timestamp
+        for (var doc in snapshot.docs) doc.id: doc['deletedAt'] as Timestamp
       };
     });
   }
@@ -122,11 +115,9 @@ class _HomeScreenState extends State<HomeScreen> {
               final contactName = data?['contactName'] ?? 'Unknown';
               final contactImage = data?['contactImage'] ?? '';
               final lastMessage = data?['lastMessage'] ?? '';
-              final lastMessageTimestamp =
-              data?['lastMessageTimestamp'] as Timestamp?;
+              final lastMessageTimestamp = data?['lastMessageTimestamp'] as Timestamp?;
               final seen = data?['seen'] ?? true;
 
-              //  Hide deleted conversation unless a new message is received
               final deletedAt = deletedConversations[contactId];
               if (deletedAt != null &&
                   (lastMessageTimestamp == null ||
@@ -145,15 +136,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: Text(
                   contactName,
                   style: TextStyle(
-                      fontWeight:
-                      seen ? FontWeight.normal : FontWeight.bold),
+                    fontWeight: seen ? FontWeight.normal : FontWeight.bold,
+                  ),
                 ),
                 subtitle: Text(
-                  lastMessage.isNotEmpty ? CryptoService.decryptText(lastMessage) : "No messages yet",
+                  lastMessage.isNotEmpty
+                      ? CryptoService.decryptText(lastMessage)
+                      : "No messages yet",
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
-                  style: TextStyle(
-                      color: seen ? Colors.black : Colors.blue),
+                  style: TextStyle(color: seen ? Colors.black : Colors.blue),
                 ),
                 trailing: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -166,11 +158,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: const TextStyle(fontSize: 12),
                     ),
                     if (!seen)
-                      const Icon(Icons.circle,
-                          color: Colors.red, size: 10),
+                      const Icon(Icons.circle, color: Colors.red, size: 10),
                   ],
                 ),
-                onTap: () {
+                onTap: () async {
+                  // ✅ Clear the red dot (mark conversation as seen)
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(widget.currentUserId)
+                      .collection('conversations')
+                      .doc(contactId)
+                      .update({'seen': true});
+
                   if (isGroup) {
                     Navigator.push(
                       context,
@@ -201,7 +200,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     builder: (context) => AlertDialog(
                       title: Text("Delete conversation?"),
                       content: Text(
-                          "This will hide the conversation from your home screen. You’ll see it again if someone sends a new message."),
+                        "This will hide the conversation from your home screen. You’ll see it again if someone sends a new message.",
+                      ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),
@@ -221,10 +221,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         .doc(widget.currentUserId)
                         .collection('deletedConversations')
                         .doc(contactId)
-                        .set({
-                      'deletedAt': Timestamp.now(),
-                    });
-                    _fetchDeletedConversations(); // Refresh
+                        .set({'deletedAt': Timestamp.now()});
+                    _fetchDeletedConversations();
                   }
                 },
               );

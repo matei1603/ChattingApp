@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/profile_service.dart';
 import '../services/auth_service.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'package:permission_handler/permission_handler.dart';
+import 'location_picker_screen.dart';
 import 'login.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -25,6 +27,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? profileImageUrl;
   File? _pickedImage;
 
+  GeoPoint? homeLocation;
+  GeoPoint? workLocation;
+
   @override
   void initState() {
     super.initState();
@@ -45,77 +50,67 @@ class _ProfileScreenState extends State<ProfileScreen> {
         name = userData['name'] ?? '';
         profileImageUrl = userData['profileImage'];
         nameController.text = name;
+        homeLocation = userData['homeLocation'];
+        workLocation = userData['workLocation'];
       });
     }
-  }
-
-  Future<bool> _requestStoragePermission() async {
-    var status = await Permission.photos.request();
-
-    if (status.isGranted) {
-      print("Storage permission granted.");
-      return true;
-    } else if (status.isPermanentlyDenied) {
-      print("Storage permission permanently denied.");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Permission denied. Enable it from app settings.')),
-      );
-      openAppSettings();
-      return false;
-    }
-    return false;
   }
 
   Future<void> _pickImage() async {
-    bool hasPermission = await _requestStoragePermission();
-    if (!hasPermission) return;
+    final status = await Permission.photos.request();
+    if (!status.isGranted) return;
 
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
-      setState(() {
-        _pickedImage = File(pickedFile.path);
-      });
-
+      setState(() => _pickedImage = File(pickedFile.path));
       try {
-        final imageUrl = await _profileService.uploadProfileImage(
-            widget.currentUserId, _pickedImage!);
-
+        final imageUrl = await _profileService.uploadProfileImage(widget.currentUserId, _pickedImage!);
         await _profileService.updateUserData(widget.currentUserId, {'profileImage': imageUrl});
-
-        setState(() {
-          profileImageUrl = imageUrl;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Profile picture updated successfully!')),
-        );
+        setState(() => profileImageUrl = imageUrl);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Profile picture updated.')));
       } catch (e) {
-        print('Error updating profile picture: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload profile picture. Please try again.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update profile image.')));
       }
     }
+  }
+
+  Future<void> _chooseLocation(String type) async {
+    final status = await Permission.location.request();
+    if (!status.isGranted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Location permission denied.")));
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          onLocationSelected: (latLng) async {
+            GeoPoint location = GeoPoint(latLng.latitude, latLng.longitude);
+            await _profileService.updateUserData(widget.currentUserId, {
+              type == 'home' ? 'homeLocation': 'workLocation': location,
+            });
+            setState(() {
+              if (type == 'home') homeLocation = location;
+              if (type == 'work') workLocation = location;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$type location saved!')));
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _saveProfile() async {
     try {
       await _profileService.updateUserData(widget.currentUserId, {'name': nameController.text});
-
       setState(() {
         name = nameController.text;
         isEditing = false;
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Profile updated successfully!')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Profile updated.')));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update profile.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update profile.')));
     }
   }
 
@@ -123,9 +118,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (isEditing) {
       _saveProfile();
     } else {
-      setState(() {
-        isEditing = true;
-      });
+      setState(() => isEditing = true);
     }
   }
 
@@ -133,8 +126,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _authService.signOut();
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => LoginPage()),
-          (Route<dynamic> route) => false,
+      MaterialPageRoute(builder: (_) => LoginPage()),
+          (route) => false,
     );
   }
 
@@ -159,10 +152,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 radius: 70,
                 backgroundImage: _pickedImage != null
                     ? FileImage(_pickedImage!)
-                    : (profileImageUrl != null && profileImageUrl!.isNotEmpty
+                    : (profileImageUrl?.isNotEmpty ?? false)
                     ? NetworkImage(profileImageUrl!)
-                    : AssetImage('assets/profile_pic.jpg'))
-                as ImageProvider,
+                    : AssetImage('assets/profile_pic.jpg') as ImageProvider,
               ),
             ),
             const SizedBox(height: 20),
@@ -171,19 +163,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               controller: nameController,
               textAlign: TextAlign.center,
             )
-                : Text(
-              name,
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                : Text(name, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () => _chooseLocation('home'),
+              icon: Icon(Icons.home),
+              label: Text(homeLocation != null ? "Update Home Location" : "Set Home Location"),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => _chooseLocation('work'),
+              icon: Icon(Icons.work),
+              label: Text(workLocation != null ? "Update Work Location" : "Set Work Location"),
             ),
             const Spacer(),
-            ElevatedButton(
-              onPressed: _toggleEditMode,
-              child: Text(isEditing ? 'Save' : 'Edit'),
-            ),
-            ElevatedButton(
-              onPressed: _signOut,
-              child: Text('Sign Out'),
-            ),
+            ElevatedButton(onPressed: _toggleEditMode, child: Text(isEditing ? 'Save' : 'Edit')),
+            ElevatedButton(onPressed: _signOut, child: Text('Sign Out')),
             const SizedBox(height: 40),
           ],
         ),
