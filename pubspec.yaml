@@ -37,6 +37,9 @@ dependencies:
   google_maps_flutter: ^2.5.0
   geolocator: ^10.1.0
 
+#  flutter_typeahead: ^4.8.0
+
+  flutter_google_places_hoc081098: ^2.0.0
   flutter_local_notifications: ^19.0.0
 
 
@@ -51,6 +54,10 @@ dependencies:
   firebase_messaging: ^15.1.5
   image_picker: ^1.1.2
   firebase_storage: ^12.4.0
+
+#dependency_overrides:
+#  flutter_keyboard_visibility: 0.7.0
+
 
 dev_dependencies:
   flutter_test:
