@@ -2,11 +2,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_selector/file_selector.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../services/crypto_service.dart';
 import '../services/group_chat_service.dart';
 import 'group_chat_info_screen.dart';
 import 'add_people_to_group_screen.dart';
 import 'group_seen_screen.dart';
+import 'image_viewer_page.dart'; // New screen to view full images
 
 class GroupChatScreen extends StatefulWidget {
   final String groupId;
@@ -56,19 +60,31 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
-  void _sendImageMessage(File imageFile) async {
-    await _groupChatService.sendImageMessage(
-      widget.groupId,
-      widget.currentUserId,
-      imageFile,
-    );
-  }
-
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       File image = File(pickedFile.path);
-      _sendImageMessage(image);
+      await _groupChatService.sendImageMessage(
+        widget.groupId,
+        widget.currentUserId,
+        image,
+      );
+    }
+  }
+
+  Future<void> _pickDocument() async {
+    final XFile? file = await openFile(
+      acceptedTypeGroups: [
+        XTypeGroup(label: 'documents', extensions: ['pdf', 'doc', 'docx', 'txt']),
+      ],
+    );
+    if (file != null) {
+      File docFile = File(file.path);
+      await _groupChatService.sendDocumentMessage(
+        widget.groupId,
+        widget.currentUserId,
+        docFile,
+      );
     }
   }
 
@@ -99,10 +115,12 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         ? CryptoService.decryptText(message['message'])
         : '';
 
-    final encryptedUrl = message['imageUrl'];
-    final imageUrl = encryptedUrl != null && encryptedUrl != ''
-        ? CryptoService.decryptText(encryptedUrl)
+    final encryptedImageUrl = message['imageUrl'];
+    final imageUrl = encryptedImageUrl != null && encryptedImageUrl != ''
+        ? CryptoService.decryptText(encryptedImageUrl)
         : null;
+
+    final documentUrl = message['documentUrl'];
 
     return FutureBuilder<String>(
       future: _getUserName(senderId),
@@ -141,18 +159,48 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                   color: isCurrentUser ? Colors.blue : Colors.grey[300],
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: imageUrl != null
-                    ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    imageUrl,
-                    width: 200,
-                    fit: BoxFit.cover,
-                  ),
-                )
-                    : Text(
-                  text,
-                  style: TextStyle(color: isCurrentUser ? Colors.white : Colors.black),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (imageUrl != null)
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => ImageViewerPage(imageUrl: imageUrl)),
+                          );
+                        },
+                        child: Image.network(
+                          imageUrl,
+                          width: 200,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    if (text.isNotEmpty)
+                      Text(
+                        text,
+                        style: TextStyle(color: isCurrentUser ? Colors.white : Colors.black),
+                      ),
+                    if (documentUrl != null)
+                      GestureDetector(
+                        onTap: () async {
+                          final uri = Uri.parse(documentUrl);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open document')));
+                          }
+                        },
+                        child: Text(
+                          '📄 Open Document',
+                          style: TextStyle(
+                            decoration: TextDecoration.underline,
+                            color: isCurrentUser ? Colors.white : Colors.blueAccent,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
@@ -236,6 +284,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 IconButton(
                   icon: Icon(Icons.image),
                   onPressed: _pickImage,
+                ),
+                IconButton(
+                  icon: Icon(Icons.attach_file),
+                  onPressed: _pickDocument,
                 ),
                 Expanded(
                   child: TextField(

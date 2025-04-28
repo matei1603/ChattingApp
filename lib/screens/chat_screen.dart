@@ -1,11 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_selector/file_selector.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/chat_service.dart';
 import '../services/crypto_service.dart';
 import '../services/location_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'message_request_dialog.dart';
+import 'image_viewer_page.dart';
 
 class ChatPage extends StatefulWidget {
   final String currentUserId;
@@ -165,14 +168,6 @@ class _ChatPageState extends State<ChatPage> {
         visibility: _visibility,
       );
       _messageController.clear();
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.currentUserId)
-          .collection('deletedConversations')
-          .doc(chatId)
-          .delete()
-          .catchError((_) {});
     }
   }
 
@@ -188,21 +183,25 @@ class _ChatPageState extends State<ChatPage> {
         imageFile,
         visibility: _visibility,
       );
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.currentUserId)
-          .collection('deletedConversations')
-          .doc(chatId)
-          .delete()
-          .catchError((_) {});
     }
   }
 
-  String _formatSeenTimestamp(Timestamp? timestamp) {
-    if (timestamp == null) return "Recently";
-    final date = timestamp.toDate();
-    return "${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+  Future<void> _sendDocumentMessage() async {
+    final XFile? file = await openFile(
+      acceptedTypeGroups: [
+        XTypeGroup(label: 'documents', extensions: ['pdf', 'doc', 'docx', 'txt']),
+      ],
+    );
+    if (file != null) {
+      final pickedFile = File(file.path);
+      await _chatService.sendDocumentMessage(
+        chatId,
+        widget.currentUserId,
+        widget.contactId,
+        pickedFile,
+        visibility: _visibility,
+      );
+    }
   }
 
   Future<List<Map<String, dynamic>>> _filterMessages(List<QueryDocumentSnapshot> allMessages) async {
@@ -233,6 +232,12 @@ class _ChatPageState extends State<ChatPage> {
     }
 
     return filtered;
+  }
+
+  String _formatSeenTimestamp(Timestamp? timestamp) {
+    if (timestamp == null) return "Recently";
+    final date = timestamp.toDate();
+    return "${date.hour}:${date.minute.toString().padLeft(2, '0')}";
   }
 
   @override
@@ -269,15 +274,6 @@ class _ChatPageState extends State<ChatPage> {
                       }
                     });
 
-                    int lastSeenIndex = -1;
-                    for (int i = messages.length - 1; i >= 0; i--) {
-                      var data = messages[i]['data'] as Map<String, dynamic>;
-                      if (data['seen'] == true && data['senderId'] == widget.currentUserId) {
-                        lastSeenIndex = i;
-                        break;
-                      }
-                    }
-
                     return ListView.builder(
                       controller: _scrollController,
                       itemCount: messages.length,
@@ -286,7 +282,6 @@ class _ChatPageState extends State<ChatPage> {
                         final restricted = messages[index]['restricted'] as bool;
                         final isCurrentUser = data['senderId'] == widget.currentUserId;
                         final visibility = data['visibility'] ?? 'public';
-                        final seenTimestamp = data['seenTimestamp'] as Timestamp?;
 
                         if (restricted) {
                           final msg = visibility == 'home'
@@ -294,20 +289,15 @@ class _ChatPageState extends State<ChatPage> {
                               : "You can see this message when you are at work";
                           return Padding(
                             padding: const EdgeInsets.all(10),
-                            child: Text(
-                              msg,
-                              style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
-                            ),
+                            child: Text(msg, style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
                           );
                         }
 
                         final encryptedImageUrl = data['imageUrl'];
-                        final imageUrl = encryptedImageUrl != null && encryptedImageUrl != ''
-                            ? CryptoService.decryptText(encryptedImageUrl)
-                            : null;
-                        final text = data['message'] != null && data['message'] != ''
-                            ? CryptoService.decryptText(data['message'])
-                            : '';
+                        final imageUrl = encryptedImageUrl != null && encryptedImageUrl != '' ? CryptoService.decryptText(encryptedImageUrl) : null;
+                        final encryptedDocUrl = data['documentUrl'];
+                        final documentUrl = encryptedDocUrl != null && encryptedDocUrl != '' ? CryptoService.decryptText(encryptedDocUrl) : null;
+                        final text = data['message'] != null && data['message'] != '' ? CryptoService.decryptText(data['message']) : '';
 
                         return Column(
                           crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -323,29 +313,44 @@ class _ChatPageState extends State<ChatPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   if (imageUrl != null)
-                                    Image.network(imageUrl, height: 200),
+                                    GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => ImageViewerPage(imageUrl: imageUrl),
+                                          ),
+                                        );
+                                      },
+                                      child: Image.network(imageUrl, height: 200),
+                                    ),
                                   if (text.isNotEmpty)
-                                    Text(
-                                      text,
-                                      style: TextStyle(
-                                        color: isCurrentUser ? Colors.white : Colors.black,
+                                    Text(text, style: TextStyle(color: isCurrentUser ? Colors.white : Colors.black)),
+                                  if (documentUrl != null)
+                                    GestureDetector(
+                                      onTap: () async {
+                                        final uri = Uri.parse(documentUrl);
+                                        if (await canLaunchUrl(uri)) {
+                                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                        } else {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Could not open document')),
+                                          );
+                                        }
+                                      },
+                                      child: Text(
+                                        '📄 Open Document',
+                                        style: TextStyle(
+                                          decoration: TextDecoration.underline,
+                                          color: isCurrentUser ? Colors.white : Colors.blueAccent,
+                                          fontSize: 16,
+                                        ),
                                       ),
                                     ),
-                                  Text(
-                                    visibilityEmoji[visibility] ?? '',
-                                    style: TextStyle(fontSize: 14),
-                                  ),
+                                  Text(visibilityEmoji[visibility] ?? '', style: TextStyle(fontSize: 14)),
                                 ],
                               ),
                             ),
-                            if (index == lastSeenIndex)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 10.0),
-                                child: Text(
-                                  "Seen ${_formatSeenTimestamp(seenTimestamp)}",
-                                  style: const TextStyle(fontSize: 12, color: Colors.green),
-                                ),
-                              ),
                           ],
                         );
                       },
@@ -364,16 +369,11 @@ class _ChatPageState extends State<ChatPage> {
                     onTap: _toggleVisibility,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        visibilityEmoji[_visibility]!,
-                        style: TextStyle(fontSize: 24),
-                      ),
+                      child: Text(visibilityEmoji[_visibility]!, style: TextStyle(fontSize: 24)),
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(Icons.image),
-                    onPressed: _sendImageMessage,
-                  ),
+                  IconButton(icon: Icon(Icons.image), onPressed: _sendImageMessage),
+                  IconButton(icon: Icon(Icons.attach_file), onPressed: _sendDocumentMessage),
                   Expanded(
                     child: TextField(
                       controller: _messageController,
@@ -383,10 +383,7 @@ class _ChatPageState extends State<ChatPage> {
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.send),
-                    onPressed: _sendMessage,
-                  ),
+                  IconButton(icon: const Icon(Icons.send), onPressed: _sendMessage),
                 ],
               ),
             ),

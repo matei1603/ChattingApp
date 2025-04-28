@@ -29,6 +29,7 @@ class ChatService {
       'receiverId': receiverId,
       'message': encryptedMessage,
       'imageUrl': null,
+      'documentUrl': null,
       'timestamp': FieldValue.serverTimestamp(),
       'seen': false,
       'seenTimestamp': null,
@@ -49,7 +50,7 @@ class ChatService {
     final chatRef = _firestore.collection('chats').doc(chatId);
     final messagesRef = chatRef.collection('messages');
 
-    final imageUrl = await _uploadChatImage(chatId, imageFile);
+    final imageUrl = await _uploadFile(chatId, imageFile, folder: 'chat_images');
     final encryptedUrl = CryptoService.encrypt(imageUrl);
 
     await messagesRef.add({
@@ -57,6 +58,7 @@ class ChatService {
       'receiverId': receiverId,
       'message': '',
       'imageUrl': encryptedUrl,
+      'documentUrl': null,
       'timestamp': FieldValue.serverTimestamp(),
       'seen': false,
       'seenTimestamp': null,
@@ -68,11 +70,41 @@ class ChatService {
     await _removeDeletedFlag(receiverId, chatId);
   }
 
-  Future<String> _uploadChatImage(String chatId, File image) async {
+  Future<void> sendDocumentMessage(
+      String chatId,
+      String senderId,
+      String receiverId,
+      File documentFile, {
+        String visibility = 'public',
+      }) async {
+    final chatRef = _firestore.collection('chats').doc(chatId);
+    final messagesRef = chatRef.collection('messages');
+
+    final documentUrl = await _uploadFile(chatId, documentFile, folder: 'chat_documents');
+    final encryptedUrl = CryptoService.encrypt(documentUrl);
+
+    await messagesRef.add({
+      'senderId': senderId,
+      'receiverId': receiverId,
+      'message': '',
+      'imageUrl': null,
+      'documentUrl': encryptedUrl,
+      'timestamp': FieldValue.serverTimestamp(),
+      'seen': false,
+      'seenTimestamp': null,
+      'visibility': visibility,
+    });
+
+    final preview = CryptoService.encrypt('[Document]');
+    await _updateConversations(senderId, receiverId, preview);
+    await _removeDeletedFlag(receiverId, chatId);
+  }
+
+  Future<String> _uploadFile(String chatId, File file, {required String folder}) async {
     final storageRef = FirebaseStorage.instance
         .ref()
-        .child('chat_images/$chatId/${DateTime.now().millisecondsSinceEpoch}.jpg');
-    await storageRef.putFile(image);
+        .child('$folder/$chatId/${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}');
+    await storageRef.putFile(file);
     return await storageRef.getDownloadURL();
   }
 

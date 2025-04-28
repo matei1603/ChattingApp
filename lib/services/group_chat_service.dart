@@ -5,7 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 class GroupChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  ///  Create a new group chat
+  /// Create group chat (unchanged)
   Future<void> createGroupChat(String adminUserId, List<String> memberIds, String groupName) async {
     try {
       if (!memberIds.contains(adminUserId)) {
@@ -43,7 +43,7 @@ class GroupChatService {
     }
   }
 
-  ///  Fetch group chat details
+  /// Fetch group data (unchanged)
   Future<Map<String, dynamic>?> getGroupData(String groupId) async {
     try {
       final doc = await _firestore.collection('chats').doc(groupId).get();
@@ -54,7 +54,7 @@ class GroupChatService {
     }
   }
 
-  ///  Stream messages
+  /// Stream messages (unchanged)
   Stream<QuerySnapshot> getMessages(String groupId) {
     return _firestore
         .collection('chats')
@@ -64,32 +64,25 @@ class GroupChatService {
         .snapshots();
   }
 
-  ///  Send text message
+  /// Send text message (unchanged)
   Future<void> sendMessage(String groupId, String senderId, String message) async {
     try {
       await _firestore.collection('chats').doc(groupId).collection('messages').add({
         'senderId': senderId,
         'message': message,
+        'imageUrl': null,
+        'documentUrl': null,
         'timestamp': FieldValue.serverTimestamp(),
         'seenBy': [senderId],
       });
 
-      final groupDoc = await _firestore.collection('chats').doc(groupId).get();
-      if (groupDoc.exists) {
-        final members = List<String>.from(groupDoc.data()?['members'] ?? []);
-        for (String memberId in members) {
-          await _firestore.collection('users').doc(memberId).collection('conversations').doc(groupId).update({
-            'lastMessage': message,
-            'lastMessageTimestamp': FieldValue.serverTimestamp(),
-          });
-        }
-      }
+      await _updateLastMessage(groupId, message);
     } catch (e) {
       print("Error sending group message: $e");
     }
   }
 
-  ///  Send image message
+  /// Send image message (unchanged)
   Future<void> sendImageMessage(String groupId, String senderId, File imageFile) async {
     try {
       final storageRef = FirebaseStorage.instance
@@ -101,25 +94,58 @@ class GroupChatService {
 
       await _firestore.collection('chats').doc(groupId).collection('messages').add({
         'senderId': senderId,
+        'message': '',
         'imageUrl': imageUrl,
+        'documentUrl': null,
         'timestamp': FieldValue.serverTimestamp(),
         'seenBy': [senderId],
       });
 
-      final groupDoc = await _firestore.collection('chats').doc(groupId).get();
-      final members = List<String>.from(groupDoc.data()?['members'] ?? []);
-      for (String memberId in members) {
-        await _firestore.collection('users').doc(memberId).collection('conversations').doc(groupId).update({
-          'lastMessage': '[Image]',
-          'lastMessageTimestamp': FieldValue.serverTimestamp(),
-        });
-      }
+      await _updateLastMessage(groupId, '[Image]');
     } catch (e) {
       print("Error sending image message: $e");
     }
   }
 
-  ///  Mark a message as seen
+  /// 🔥 New method: send document
+  Future<void> sendDocumentMessage(String groupId, String senderId, File documentFile) async {
+    try {
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('group_documents/$groupId/${DateTime.now().millisecondsSinceEpoch}_${documentFile.path.split('/').last}');
+
+      await storageRef.putFile(documentFile);
+      final documentUrl = await storageRef.getDownloadURL();
+
+      await _firestore.collection('chats').doc(groupId).collection('messages').add({
+        'senderId': senderId,
+        'message': '',
+        'imageUrl': null,
+        'documentUrl': documentUrl,
+        'timestamp': FieldValue.serverTimestamp(),
+        'seenBy': [senderId],
+      });
+
+      await _updateLastMessage(groupId, '[Document]');
+    } catch (e) {
+      print("Error sending document: $e");
+    }
+  }
+
+  /// Update last message in conversations (unchanged)
+  Future<void> _updateLastMessage(String groupId, String lastMessage) async {
+    final groupDoc = await _firestore.collection('chats').doc(groupId).get();
+    final members = List<String>.from(groupDoc.data()?['members'] ?? []);
+
+    for (String memberId in members) {
+      await _firestore.collection('users').doc(memberId).collection('conversations').doc(groupId).update({
+        'lastMessage': lastMessage,
+        'lastMessageTimestamp': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  /// Mark message as seen (unchanged)
   Future<void> markMessageAsSeen(String groupId, String messageId, String userId) async {
     try {
       final messageRef = _firestore.collection('chats').doc(groupId).collection('messages').doc(messageId);
@@ -131,7 +157,7 @@ class GroupChatService {
     }
   }
 
-  ///  Upload group photo
+  /// Upload group photo (unchanged)
   Future<String> uploadGroupImage(String groupId, File image) async {
     try {
       final ref = FirebaseStorage.instance.ref().child('group_images').child('$groupId.jpg');
@@ -143,7 +169,7 @@ class GroupChatService {
     }
   }
 
-  ///  Update group name or image
+  /// Update group name or photo (unchanged)
   Future<void> updateGroupChat(String groupId, String updatedById, String? newName, String? newImage) async {
     try {
       Map<String, dynamic> updates = {};
@@ -185,7 +211,7 @@ class GroupChatService {
     }
   }
 
-  ///  Get members who have seen a message
+  /// Get seen users (unchanged)
   Future<List<String>> getSeenUserNames(String groupId, String messageId) async {
     try {
       final messageDoc = await _firestore.collection('chats').doc(groupId).collection('messages').doc(messageId).get();
@@ -204,7 +230,7 @@ class GroupChatService {
     }
   }
 
-  ///  Leave group
+  /// Leave group (unchanged)
   Future<void> leaveGroup(String groupId, String userId, String userName) async {
     try {
       final groupRef = _firestore.collection('chats').doc(groupId);
@@ -225,7 +251,7 @@ class GroupChatService {
     }
   }
 
-  ///  Add members to group
+  /// Add members (unchanged)
   Future<void> addMembersToGroup(String groupId, List<String> newMembers, String addedBy) async {
     try {
       final groupRef = _firestore.collection('chats').doc(groupId);
