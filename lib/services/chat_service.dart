@@ -19,7 +19,7 @@ class ChatService {
       String message, {
         String visibility = 'public',
       }) async {
-    final encryptedMessage = CryptoService.encrypt(message);
+    final encryptedMessage = await CryptoService.encrypt(message, receiverId);
 
     final chatRef = _firestore.collection('chats').doc(chatId);
     final messagesRef = chatRef.collection('messages');
@@ -36,7 +36,7 @@ class ChatService {
       'visibility': visibility,
     });
 
-    await _updateConversations(senderId, receiverId, encryptedMessage);
+    await _updateConversations(senderId, receiverId, encryptedMessage, visibility);
     await _removeDeletedFlag(receiverId, chatId);
   }
 
@@ -51,7 +51,7 @@ class ChatService {
     final messagesRef = chatRef.collection('messages');
 
     final imageUrl = await _uploadFile(chatId, imageFile, folder: 'chat_images');
-    final encryptedUrl = CryptoService.encrypt(imageUrl);
+    final encryptedUrl = await CryptoService.encrypt(imageUrl, receiverId);
 
     await messagesRef.add({
       'senderId': senderId,
@@ -65,8 +65,8 @@ class ChatService {
       'visibility': visibility,
     });
 
-    final preview = CryptoService.encrypt('[Image]');
-    await _updateConversations(senderId, receiverId, preview);
+    final preview = await CryptoService.encrypt('[Image]', receiverId);
+    await _updateConversations(senderId, receiverId, preview, visibility);
     await _removeDeletedFlag(receiverId, chatId);
   }
 
@@ -81,7 +81,7 @@ class ChatService {
     final messagesRef = chatRef.collection('messages');
 
     final documentUrl = await _uploadFile(chatId, documentFile, folder: 'chat_documents');
-    final encryptedUrl = CryptoService.encrypt(documentUrl);
+    final encryptedUrl = await CryptoService.encrypt(documentUrl, receiverId);
 
     await messagesRef.add({
       'senderId': senderId,
@@ -95,8 +95,8 @@ class ChatService {
       'visibility': visibility,
     });
 
-    final preview = CryptoService.encrypt('[Document]');
-    await _updateConversations(senderId, receiverId, preview);
+    final preview = await CryptoService.encrypt('[Document]', receiverId);
+    await _updateConversations(senderId, receiverId, preview, visibility);
     await _removeDeletedFlag(receiverId, chatId);
   }
 
@@ -112,6 +112,7 @@ class ChatService {
       String senderId,
       String receiverId,
       String encryptedLastMessage,
+      String visibility,
       ) async {
     final senderDoc = await _firestore.collection('users').doc(senderId).get();
     final receiverDoc = await _firestore.collection('users').doc(receiverId).get();
@@ -132,6 +133,7 @@ class ChatService {
       "seen": true,
       "contactName": receiverName,
       "contactImage": receiverImage,
+      "visibility": visibility,
     }, SetOptions(merge: true));
 
     await _firestore
@@ -145,6 +147,7 @@ class ChatService {
       "seen": false,
       "contactName": senderName,
       "contactImage": senderImage,
+      "visibility": visibility,
     }, SetOptions(merge: true));
   }
 

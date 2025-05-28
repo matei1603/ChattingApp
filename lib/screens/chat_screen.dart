@@ -234,6 +234,30 @@ class _ChatPageState extends State<ChatPage> {
     return filtered;
   }
 
+  Future<Map<String, String>> _decryptMessageData(Map<String, dynamic> data) async {
+    final decrypted = <String, String>{};
+
+    try {
+      if (data['message'] != null && data['message'].toString().isNotEmpty) {
+        decrypted['text'] = await CryptoService.decryptText(data['message']);
+      } else {
+        decrypted['text'] = '';
+      }
+
+      if (data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty) {
+        decrypted['imageUrl'] = await CryptoService.decryptText(data['imageUrl']);
+      }
+
+      if (data['documentUrl'] != null && data['documentUrl'].toString().isNotEmpty) {
+        decrypted['documentUrl'] = await CryptoService.decryptText(data['documentUrl']);
+      }
+    } catch (_) {
+      decrypted['text'] = '[Decryption Failed]';
+    }
+
+    return decrypted;
+  }
+
   String _formatSeenTimestamp(Timestamp? timestamp) {
     if (timestamp == null) return "Recently";
     final date = timestamp.toDate();
@@ -293,65 +317,74 @@ class _ChatPageState extends State<ChatPage> {
                           );
                         }
 
-                        final encryptedImageUrl = data['imageUrl'];
-                        final imageUrl = encryptedImageUrl != null && encryptedImageUrl != '' ? CryptoService.decryptText(encryptedImageUrl) : null;
-                        final encryptedDocUrl = data['documentUrl'];
-                        final documentUrl = encryptedDocUrl != null && encryptedDocUrl != '' ? CryptoService.decryptText(encryptedDocUrl) : null;
-                        final text = data['message'] != null && data['message'] != '' ? CryptoService.decryptText(data['message']) : '';
-
-                        return Column(
-                          crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                        return FutureBuilder<Map<String, String>>(
+                          future: _decryptMessageData(data),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) return Padding(
                               padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: isCurrentUser ? Colors.blue : Colors.grey[300],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (imageUrl != null)
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => ImageViewerPage(imageUrl: imageUrl),
-                                          ),
-                                        );
-                                      },
-                                      child: Image.network(imageUrl, height: 200),
-                                    ),
-                                  if (text.isNotEmpty)
-                                    Text(text, style: TextStyle(color: isCurrentUser ? Colors.white : Colors.black)),
-                                  if (documentUrl != null)
-                                    GestureDetector(
-                                      onTap: () async {
-                                        final uri = Uri.parse(documentUrl);
-                                        if (await canLaunchUrl(uri)) {
-                                          await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                        } else {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text('Could not open document')),
-                                          );
-                                        }
-                                      },
-                                      child: Text(
-                                        '📄 Open Document',
-                                        style: TextStyle(
-                                          decoration: TextDecoration.underline,
-                                          color: isCurrentUser ? Colors.white : Colors.blueAccent,
-                                          fontSize: 16,
+                              child: Center(child: CircularProgressIndicator()),
+                            );
+
+                            final decrypted = snapshot.data!;
+                            final imageUrl = decrypted['imageUrl'];
+                            final documentUrl = decrypted['documentUrl'];
+                            final text = decrypted['text'];
+
+                            return Column(
+                              crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: isCurrentUser ? Colors.blue : Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (imageUrl != null && imageUrl.isNotEmpty)
+                                        GestureDetector(
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => ImageViewerPage(imageUrl: imageUrl),
+                                              ),
+                                            );
+                                          },
+                                          child: Image.network(imageUrl, height: 200),
                                         ),
-                                      ),
-                                    ),
-                                  Text(visibilityEmoji[visibility] ?? '', style: TextStyle(fontSize: 14)),
-                                ],
-                              ),
-                            ),
-                          ],
+                                      if (text != null && text.isNotEmpty)
+                                        Text(text, style: TextStyle(color: isCurrentUser ? Colors.white : Colors.black)),
+                                      if (documentUrl != null && documentUrl.isNotEmpty)
+                                        GestureDetector(
+                                          onTap: () async {
+                                            final uri = Uri.parse(documentUrl);
+                                            if (await canLaunchUrl(uri)) {
+                                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                            } else {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(content: Text('Could not open document')),
+                                              );
+                                            }
+                                          },
+                                          child: Text(
+                                            '📄 Open Document',
+                                            style: TextStyle(
+                                              decoration: TextDecoration.underline,
+                                              color: isCurrentUser ? Colors.white : Colors.blueAccent,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ),
+                                      Text(visibilityEmoji[visibility] ?? '', style: TextStyle(fontSize: 14)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         );
                       },
                     );

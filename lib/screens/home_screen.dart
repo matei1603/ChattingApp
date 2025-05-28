@@ -125,105 +125,110 @@ class _HomeScreenState extends State<HomeScreen> {
                 return SizedBox();
               }
 
-              return ListTile(
-                leading: CircleAvatar(
-                  radius: 24,
-                  backgroundImage: contactImage.isNotEmpty
-                      ? NetworkImage(contactImage)
-                      : const AssetImage('assets/profile_pic.jpg')
-                  as ImageProvider,
-                ),
-                title: Text(
-                  contactName,
-                  style: TextStyle(
-                    fontWeight: seen ? FontWeight.normal : FontWeight.bold,
-                  ),
-                ),
-                subtitle: Text(
-                  lastMessage.isNotEmpty
-                      ? CryptoService.decryptText(lastMessage)
-                      : "No messages yet",
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                  style: TextStyle(color: seen ? Colors.black : Colors.blue),
-                ),
-                trailing: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      lastMessageTimestamp != null
-                          ? _formatTimestamp(lastMessageTimestamp)
-                          : "",
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    if (!seen)
-                      const Icon(Icons.circle, color: Colors.red, size: 10),
-                  ],
-                ),
-                onTap: () async {
-                  // ✅ Clear the red dot (mark conversation as seen)
-                  await FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(widget.currentUserId)
-                      .collection('conversations')
-                      .doc(contactId)
-                      .update({'seen': true});
+              return FutureBuilder<String>(
+                future: lastMessage.isNotEmpty
+                    ? CryptoService.decryptText(lastMessage)
+                    : Future.value("No messages yet"),
+                builder: (context, decryptedSnapshot) {
+                  final decryptedText = decryptedSnapshot.data ?? "[Invalid]";
 
-                  if (isGroup) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => GroupChatScreen(
-                          groupId: contactId,
-                          currentUserId: widget.currentUserId,
-                        ),
+                  return ListTile(
+                    leading: CircleAvatar(
+                      radius: 24,
+                      backgroundImage: contactImage.isNotEmpty
+                          ? NetworkImage(contactImage)
+                          : const AssetImage('assets/profile_pic.jpg') as ImageProvider,
+                    ),
+                    title: Text(
+                      contactName,
+                      style: TextStyle(
+                        fontWeight: seen ? FontWeight.normal : FontWeight.bold,
                       ),
-                    );
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ChatPage(
-                          currentUserId: widget.currentUserId,
-                          contactId: contactId,
-                          contactName: contactName,
-                          contactImage: contactImage,
+                    ),
+                    subtitle: Text(
+                      decryptedText,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: TextStyle(color: seen ? Colors.black : Colors.blue),
+                    ),
+                    trailing: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          lastMessageTimestamp != null
+                              ? _formatTimestamp(lastMessageTimestamp)
+                              : "",
+                          style: const TextStyle(fontSize: 12),
                         ),
-                      ),
-                    );
-                  }
-                },
-                onLongPress: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text("Delete conversation?"),
-                      content: Text(
-                        "This will hide the conversation from your home screen. You’ll see it again if someone sends a new message.",
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: Text("Cancel"),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: Text("Delete"),
-                        ),
+                        if (!seen)
+                          const Icon(Icons.circle, color: Colors.red, size: 10),
                       ],
                     ),
-                  );
+                    onTap: () async {
+                      await FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(widget.currentUserId)
+                          .collection('conversations')
+                          .doc(contactId)
+                          .update({'seen': true});
 
-                  if (confirm == true) {
-                    await FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(widget.currentUserId)
-                        .collection('deletedConversations')
-                        .doc(contactId)
-                        .set({'deletedAt': Timestamp.now()});
-                    _fetchDeletedConversations();
-                  }
+                      if (isGroup) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => GroupChatScreen(
+                              groupId: contactId,
+                              currentUserId: widget.currentUserId,
+                            ),
+                          ),
+                        );
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ChatPage(
+                              currentUserId: widget.currentUserId,
+                              contactId: contactId,
+                              contactName: contactName,
+                              contactImage: contactImage,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    onLongPress: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text("Delete conversation?"),
+                          content: Text(
+                            "This will hide the conversation from your home screen. You’ll see it again if someone sends a new message.",
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: Text("Cancel"),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: Text("Delete"),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm == true) {
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(widget.currentUserId)
+                            .collection('deletedConversations')
+                            .doc(contactId)
+                            .set({'deletedAt': Timestamp.now()});
+                        _fetchDeletedConversations();
+                      }
+                    },
+                  );
                 },
               );
             },

@@ -1,16 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'crypto_service.dart';
+
 Future<void> _saveUserToFirestore(User user, String name) async {
   final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
 
   await userRef.set({
     "name": name,
     "email": user.email,
-    "profilePicture": user.photoURL ?? "", // Store profile picture if available
-    "contacts": [], // Empty list at first
+    "profilePicture": user.photoURL ?? "",
+    "contacts": [],
     "createdAt": FieldValue.serverTimestamp(),
-  });
+  }, SetOptions(merge: true)); //  Add merge
 }
 
 class AuthService {
@@ -28,9 +30,16 @@ class AuthService {
         email: email,
         password: password,
       );
-      return userCredential.user;
+      final user = userCredential.user;
+
+      if (user != null) {
+        //  Initialize RSA keys
+        await CryptoService.initializeKeys(user.uid);
+      }
+
+      return user;
     } catch (e) {
-      throw e; // Re-throw the error to handle it in the UI
+      throw e;
     }
   }
 
@@ -42,17 +51,19 @@ class AuthService {
         password: password,
       );
 
-      // Update display name
-      await userCredential.user?.updateDisplayName(name);
+      final user = userCredential.user;
+      if (user != null) {
+        await user.updateDisplayName(name);
+        await CryptoService.initializeKeys(user.uid);      //  Call first
+        await _saveUserToFirestore(user, name);           // Then save info
+      }
 
-      // Save to Firestore
-      await _saveUserToFirestore(userCredential.user!, name);
-
-      return userCredential.user;
+      return user;
     } catch (e) {
       throw e;
     }
   }
+
 
   // Sign out
   Future<void> signOut() async {

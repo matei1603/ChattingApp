@@ -10,7 +10,7 @@ import '../services/group_chat_service.dart';
 import 'group_chat_info_screen.dart';
 import 'add_people_to_group_screen.dart';
 import 'group_seen_screen.dart';
-import 'image_viewer_page.dart'; // New screen to view full images
+import 'image_viewer_page.dart';
 
 class GroupChatScreen extends StatefulWidget {
   final String groupId;
@@ -107,104 +107,128 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
+  Future<Map<String, String>> _decryptGroupMessage(Map<String, dynamic> message) async {
+    final decrypted = <String, String>{};
+    try {
+      decrypted['message'] = message['message'] != null && message['message'] != ''
+          ? await CryptoService.decryptText(message['message'])
+          : '';
+
+      decrypted['imageUrl'] = message['imageUrl'] != null && message['imageUrl'] != ''
+          ? await CryptoService.decryptText(message['imageUrl'])
+          : '';
+
+      decrypted['documentUrl'] = message['documentUrl'] ?? '';
+    } catch (_) {
+      decrypted['message'] = '[Decryption Failed]';
+    }
+    return decrypted;
+  }
+
   Widget _buildMessageTile(Map<String, dynamic> message, bool isCurrentUser, String messageId) {
     final senderId = message['senderId'];
     final isSystem = senderId == 'system';
 
-    final text = message['message'] != null && message['message'] != ''
-        ? CryptoService.decryptText(message['message'])
-        : '';
-
-    final encryptedImageUrl = message['imageUrl'];
-    final imageUrl = encryptedImageUrl != null && encryptedImageUrl != ''
-        ? CryptoService.decryptText(encryptedImageUrl)
-        : null;
-
-    final documentUrl = message['documentUrl'];
-
-    return FutureBuilder<String>(
-      future: _getUserName(senderId),
+    return FutureBuilder<Map<String, String>>(
+      future: _decryptGroupMessage(message),
       builder: (context, snapshot) {
-        final senderName = snapshot.data ?? '';
-
-        if (isSystem) {
+        if (!snapshot.hasData) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Center(
-              child: Text(
-                text,
-                style: TextStyle(color: Colors.grey[700], fontStyle: FontStyle.italic),
-              ),
-            ),
+            child: Center(child: CircularProgressIndicator()),
           );
         }
 
-        return GestureDetector(
-          onLongPress: isCurrentUser ? () => _showSeenByDialog(messageId) : null,
-          child: Column(
-            crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              if (!isCurrentUser)
-                Padding(
-                  padding: const EdgeInsets.only(left: 10, bottom: 2),
+        final decrypted = snapshot.data!;
+        final text = decrypted['message'] ?? '';
+        final imageUrl = decrypted['imageUrl'];
+        final documentUrl = decrypted['documentUrl'];
+
+        return FutureBuilder<String>(
+          future: _getUserName(senderId),
+          builder: (context, userSnapshot) {
+            final senderName = userSnapshot.data ?? '';
+
+            if (isSystem) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Center(
                   child: Text(
-                    senderName,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey[700]),
+                    text,
+                    style: TextStyle(color: Colors.grey[700], fontStyle: FontStyle.italic),
                   ),
                 ),
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: isCurrentUser ? Colors.blue : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (imageUrl != null)
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => ImageViewerPage(imageUrl: imageUrl)),
-                          );
-                        },
-                        child: Image.network(
-                          imageUrl,
-                          width: 200,
-                          fit: BoxFit.cover,
-                        ),
+              );
+            }
+
+            return GestureDetector(
+              onLongPress: isCurrentUser ? () => _showSeenByDialog(messageId) : null,
+              child: Column(
+                crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  if (!isCurrentUser)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10, bottom: 2),
+                      child: Text(
+                        senderName,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey[700]),
                       ),
-                    if (text.isNotEmpty)
-                      Text(
-                        text,
-                        style: TextStyle(color: isCurrentUser ? Colors.white : Colors.black),
-                      ),
-                    if (documentUrl != null)
-                      GestureDetector(
-                        onTap: () async {
-                          final uri = Uri.parse(documentUrl);
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open document')));
-                          }
-                        },
-                        child: Text(
-                          '📄 Open Document',
-                          style: TextStyle(
-                            decoration: TextDecoration.underline,
-                            color: isCurrentUser ? Colors.white : Colors.blueAccent,
-                            fontSize: 16,
+                    ),
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isCurrentUser ? Colors.blue : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (imageUrl != null && imageUrl.isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => ImageViewerPage(imageUrl: imageUrl)),
+                              );
+                            },
+                            child: Image.network(
+                              imageUrl,
+                              width: 200,
+                              fit: BoxFit.cover,
+                            ),
                           ),
-                        ),
-                      ),
-                  ],
-                ),
+                        if (text.isNotEmpty)
+                          Text(
+                            text,
+                            style: TextStyle(color: isCurrentUser ? Colors.white : Colors.black),
+                          ),
+                        if (documentUrl != null && documentUrl.isNotEmpty)
+                          GestureDetector(
+                            onTap: () async {
+                              final uri = Uri.parse(documentUrl);
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open document')));
+                              }
+                            },
+                            child: Text(
+                              '📄 Open Document',
+                              style: TextStyle(
+                                decoration: TextDecoration.underline,
+                                color: isCurrentUser ? Colors.white : Colors.blueAccent,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

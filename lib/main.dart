@@ -1,4 +1,5 @@
 import 'package:chatting_app/services/notifications_service.dart';
+import 'package:chatting_app/theme/script.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_utilis.dart';
@@ -13,11 +14,11 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
- // FirebaseUpdater updater = FirebaseUpdater();
- // await updater.updateFirebaseStructure();
- // FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
+  // FirebaseUpdater updater = FirebaseUpdater();
+  // await updater.updateFirebaseStructure();
+  // FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
   NotificationService.requestPermission();
-
+  //await patchAllUsersConversationsVisibility();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   runApp(MyApp());
 }
