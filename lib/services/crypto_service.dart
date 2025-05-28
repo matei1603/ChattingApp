@@ -83,20 +83,21 @@ class CryptoService {
   }
 
   static Future<Map<String, dynamic>> encryptForGroup(String plaintext, List<String> memberIds) async {
-    print("🧪 encryptForGroup called with members: $memberIds");
     final aesKey = Key.fromSecureRandom(32);
     final iv = IV.fromSecureRandom(16);
     final encrypter = Encrypter(AES(aesKey));
     final encryptedMessage = encrypter.encrypt(plaintext, iv: iv).base64;
 
     final Map<String, Map<String, String>> keysMap = {};
+    final List<String> missingKeys = [];
 
     for (final memberId in memberIds) {
       final doc = await _firestore.collection('users').doc(memberId).get();
       final publicKeyPem = doc.data()?['rsaPublicKey'];
+
       if (publicKeyPem == null || publicKeyPem.trim().isEmpty) {
-        print("❌ RSA key missing for $memberId");
-        continue; // Skip encryption for this user
+        missingKeys.add(memberId);
+        continue;
       }
 
       final rsaPublic = CryptoUtils.rsaPublicKeyFromPem(publicKeyPem);
@@ -109,11 +110,20 @@ class CryptoService {
       };
     }
 
+    if (keysMap.isEmpty) {
+      throw Exception("No valid recipients with RSA keys");
+    }
+
+    if (missingKeys.isNotEmpty) {
+      print("⚠️ Skipped members without RSA keys: $missingKeys");
+    }
+
     return {
       'data': encryptedMessage,
       'keys': keysMap,
     };
   }
+
 
   static Future<String> decryptText(String encryptedBase64) async {
     try {
