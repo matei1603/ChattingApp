@@ -127,7 +127,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
               return FutureBuilder<String>(
                 future: lastMessage.isNotEmpty
+                    ? (CryptoService.isProbablyEncrypted(lastMessage)
                     ? CryptoService.decryptText(lastMessage)
+                    : Future.value(lastMessage))
                     : Future.value("No messages yet"),
                 builder: (context, decryptedSnapshot) {
                   final decryptedText = decryptedSnapshot.data ?? "[Invalid]";

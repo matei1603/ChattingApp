@@ -109,21 +109,46 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   Future<Map<String, String>> _decryptGroupMessage(Map<String, dynamic> message) async {
     final decrypted = <String, String>{};
-    try {
-      decrypted['message'] = message['message'] != null && message['message'] != ''
-          ? await CryptoService.decryptText(message['message'])
-          : '';
 
-      decrypted['imageUrl'] = message['imageUrl'] != null && message['imageUrl'] != ''
-          ? await CryptoService.decryptText(message['imageUrl'])
-          : '';
-
-      decrypted['documentUrl'] = message['documentUrl'] ?? '';
-    } catch (_) {
-      decrypted['message'] = '[Decryption Failed]';
+    if (message['senderId'] == 'system') {
+      decrypted['message'] = message['message'] ?? '';
+      return decrypted;
     }
+
+    try {
+      final wrapper = {
+        'data': message['message'],
+        'keys': message['keys'],
+      };
+      decrypted['message'] = (message['message'] != null && message['message'] != '')
+          ? await CryptoService.decryptGroupMessage(wrapper, widget.currentUserId)
+          : '';
+
+      final imageWrapper = {
+        'data': message['imageUrl'],
+        'keys': message['keys'],
+      };
+      decrypted['imageUrl'] = (message['imageUrl'] != null && message['imageUrl'] != '')
+          ? await CryptoService.decryptGroupMessage(imageWrapper, widget.currentUserId)
+          : '';
+
+      final documentWrapper = {
+        'data': message['documentUrl'],
+        'keys': message['keys'],
+      };
+      decrypted['documentUrl'] = (message['documentUrl'] != null && message['documentUrl'] != '')
+          ? await CryptoService.decryptGroupMessage(documentWrapper, widget.currentUserId)
+          : '';
+    } catch (e) {
+      print("❌ Group decryption failed: $e");
+      decrypted['message'] = '[Group Decryption Failed]';
+    }
+
     return decrypted;
   }
+
+
+
 
   Widget _buildMessageTile(Map<String, dynamic> message, bool isCurrentUser, String messageId) {
     final senderId = message['senderId'];

@@ -64,20 +64,40 @@ class GroupChatService {
 
   Future<void> sendMessage(String groupId, String senderId, String message) async {
     try {
-      final encryptedMessage = await CryptoService.encrypt(message, groupId);
+      print("📨 sendMessage called for groupId: $groupId");
+
+      final groupDoc = await _firestore.collection('chats').doc(groupId).get();
+
+      if (!groupDoc.exists) {
+        print("❌ Group does not exist.");
+        return;
+      }
+
+      final members = List<String>.from(groupDoc.data()?['members'] ?? []);
+      print("🧪 Members for group $groupId: $members");
+
+      if (members.isEmpty) {
+        print("❌ No members found in group.");
+        return;
+      }
+
+      final encrypted = await CryptoService.encryptForGroup(message, members);
+      print("🔐 Message encrypted for group.");
 
       await _firestore.collection('chats').doc(groupId).collection('messages').add({
         'senderId': senderId,
-        'message': encryptedMessage,
+        'message': encrypted['data'],
+        'keys': encrypted['keys'],
         'imageUrl': null,
         'documentUrl': null,
         'timestamp': FieldValue.serverTimestamp(),
         'seenBy': [senderId],
       });
 
-      await _updateLastMessage(groupId, encryptedMessage);
+      await _updateLastMessage(groupId, encrypted['data']);
+      print("✅ Message saved to Firestore.");
     } catch (e) {
-      print("Error sending group message: $e");
+      print("❌ Error sending group message: $e");
     }
   }
 

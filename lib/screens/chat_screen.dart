@@ -238,30 +238,28 @@ class _ChatPageState extends State<ChatPage> {
     final decrypted = <String, String>{};
 
     try {
-      if (data['message'] != null && data['message'].toString().isNotEmpty) {
-        decrypted['text'] = await CryptoService.decryptText(data['message']);
-      } else {
-        decrypted['text'] = '';
+      Future<String> tryDecrypt(String? input) async {
+        if (input == null || input.isEmpty) return '';
+        if (CryptoService.isProbablyEncrypted(input)) {
+          try {
+            return await CryptoService.decryptText(input);
+          } catch (_) {
+            return '[Decryption Failed]';
+          }
+        }
+        return input;
       }
 
-      if (data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty) {
-        decrypted['imageUrl'] = await CryptoService.decryptText(data['imageUrl']);
-      }
-
-      if (data['documentUrl'] != null && data['documentUrl'].toString().isNotEmpty) {
-        decrypted['documentUrl'] = await CryptoService.decryptText(data['documentUrl']);
-      }
-    } catch (_) {
-      decrypted['text'] = '[Decryption Failed]';
+      decrypted['text'] = await tryDecrypt(data['message']);
+      decrypted['imageUrl'] = await tryDecrypt(data['imageUrl']);
+      decrypted['documentUrl'] = await tryDecrypt(data['documentUrl']);
+    } catch (e) {
+      decrypted['text'] = '[Decryption Error]';
+      decrypted['imageUrl'] = '';
+      decrypted['documentUrl'] = '';
     }
 
     return decrypted;
-  }
-
-  String _formatSeenTimestamp(Timestamp? timestamp) {
-    if (timestamp == null) return "Recently";
-    final date = timestamp.toDate();
-    return "${date.hour}:${date.minute.toString().padLeft(2, '0')}";
   }
 
   @override

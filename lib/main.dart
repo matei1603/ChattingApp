@@ -1,5 +1,7 @@
+import 'package:chatting_app/services/crypto_service.dart';
 import 'package:chatting_app/services/notifications_service.dart';
 import 'package:chatting_app/theme/script.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_utilis.dart';
@@ -20,6 +22,10 @@ void main() async {
   NotificationService.requestPermission();
   //await patchAllUsersConversationsVisibility();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    await CryptoService.initializeKeys(user.uid);
+  }
   runApp(MyApp());
 }
 @pragma('vm:entry-point') // Required for background messages

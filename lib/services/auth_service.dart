@@ -54,8 +54,8 @@ class AuthService {
       final user = userCredential.user;
       if (user != null) {
         await user.updateDisplayName(name);
-        await CryptoService.initializeKeys(user.uid);      //  Call first
-        await _saveUserToFirestore(user, name);           // Then save info
+        await _saveUserToFirestore(user, name);           // ✅ Save Firestore user first
+        await CryptoService.initializeKeys(user.uid);      // ✅ Then generate/store keys
       }
 
       return user;
