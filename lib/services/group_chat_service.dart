@@ -103,55 +103,68 @@ class GroupChatService {
 
   Future<void> sendImageMessage(String groupId, String senderId, File imageFile) async {
     try {
+      final groupDoc = await _firestore.collection('chats').doc(groupId).get();
+      final members = List<String>.from(groupDoc.data()?['members'] ?? []);
+
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('group_images/$groupId/${DateTime.now().millisecondsSinceEpoch}.jpg');
 
       await storageRef.putFile(imageFile);
       final imageUrl = await storageRef.getDownloadURL();
-      final encryptedImageUrl = await CryptoService.encrypt(imageUrl, groupId);
+
+      final encrypted = await CryptoService.encryptForGroup(imageUrl, members);
 
       await _firestore.collection('chats').doc(groupId).collection('messages').add({
         'senderId': senderId,
         'message': '',
-        'imageUrl': encryptedImageUrl,
+        'imageUrl': encrypted['data'],
+        'keys': encrypted['keys'],
         'documentUrl': null,
         'timestamp': FieldValue.serverTimestamp(),
         'seenBy': [senderId],
       });
 
-      final preview = await CryptoService.encrypt('[Image]', groupId);
-      await _updateLastMessage(groupId, preview);
+      final preview = await CryptoService.encryptForGroup('[Image]', members);
+      await _updateLastMessage(groupId, preview['data']);
     } catch (e) {
-      print("Error sending image message: $e");
+      print("❌ Error sending image message: $e");
     }
   }
 
+
+
   Future<void> sendDocumentMessage(String groupId, String senderId, File documentFile) async {
     try {
+      final groupDoc = await _firestore.collection('chats').doc(groupId).get();
+      final members = List<String>.from(groupDoc.data()?['members'] ?? []);
+
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('group_documents/$groupId/${DateTime.now().millisecondsSinceEpoch}_${documentFile.path.split('/').last}');
 
       await storageRef.putFile(documentFile);
       final documentUrl = await storageRef.getDownloadURL();
-      final encryptedDocUrl = await CryptoService.encrypt(documentUrl, groupId);
+
+      final encrypted = await CryptoService.encryptForGroup(documentUrl, members);
 
       await _firestore.collection('chats').doc(groupId).collection('messages').add({
         'senderId': senderId,
         'message': '',
         'imageUrl': null,
-        'documentUrl': encryptedDocUrl,
+        'documentUrl': encrypted['data'],
+        'keys': encrypted['keys'],
         'timestamp': FieldValue.serverTimestamp(),
         'seenBy': [senderId],
       });
 
-      final preview = await CryptoService.encrypt('[Document]', groupId);
-      await _updateLastMessage(groupId, preview);
+      final preview = await CryptoService.encryptForGroup('[Document]', members);
+      await _updateLastMessage(groupId, preview['data']);
     } catch (e) {
-      print("Error sending document: $e");
+      print("❌ Error sending document: $e");
     }
   }
+
 
   Future<void> _updateLastMessage(String groupId, String lastMessage) async {
     final groupDoc = await _firestore.collection('chats').doc(groupId).get();
