@@ -1,6 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'crypto_service.dart';
 
 Future<void> _saveUserToFirestore(User user, String name) async {
@@ -12,13 +11,12 @@ Future<void> _saveUserToFirestore(User user, String name) async {
     "profilePicture": user.photoURL ?? "",
     "contacts": [],
     "createdAt": FieldValue.serverTimestamp(),
-  }, SetOptions(merge: true)); //  Add merge
+  }, SetOptions(merge: true));
 }
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Get current user's email
   String getCurrentUserEmail() {
     return _auth.currentUser?.email ?? '';
   }
@@ -33,7 +31,14 @@ class AuthService {
       final user = userCredential.user;
 
       if (user != null) {
-        //  Initialize RSA keys
+        try {
+          // Try to restore private key from cloud
+          await CryptoService.restorePrivateKeyFromCloud(user.uid, password);
+        } catch (e) {
+          print("❌ Failed to restore private key: $e");
+          rethrow; // or handle fallback if you want
+        }
+
         await CryptoService.initializeKeys(user.uid);
       }
 
@@ -54,8 +59,10 @@ class AuthService {
       final user = userCredential.user;
       if (user != null) {
         await user.updateDisplayName(name);
-        await _saveUserToFirestore(user, name);           // ✅ Save Firestore user first
-        await CryptoService.initializeKeys(user.uid);      // ✅ Then generate/store keys
+        await _saveUserToFirestore(user, name);
+
+        // Generate and store RSA keys (and upload encrypted private key)
+        await CryptoService.generateAndStoreKeys(user.uid, password);
       }
 
       return user;
@@ -63,7 +70,6 @@ class AuthService {
       throw e;
     }
   }
-
 
   // Sign out
   Future<void> signOut() async {

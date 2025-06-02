@@ -1,3 +1,4 @@
+// Updated ChatPage with MessageBubble integration
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,6 +10,7 @@ import '../services/location_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'message_request_dialog.dart';
 import 'image_viewer_page.dart';
+import '../screens/message_bubble.dart';
 
 class ChatPage extends StatefulWidget {
   final String currentUserId;
@@ -234,34 +236,6 @@ class _ChatPageState extends State<ChatPage> {
     return filtered;
   }
 
-  Future<Map<String, String>> _decryptMessageData(Map<String, dynamic> data) async {
-    final decrypted = <String, String>{};
-
-    try {
-      Future<String> tryDecrypt(String? input) async {
-        if (input == null || input.isEmpty) return '';
-        if (CryptoService.isProbablyEncrypted(input)) {
-          try {
-            return await CryptoService.decryptText(input);
-          } catch (_) {
-            return '[Decryption Failed]';
-          }
-        }
-        return input;
-      }
-
-      decrypted['text'] = await tryDecrypt(data['message']);
-      decrypted['imageUrl'] = await tryDecrypt(data['imageUrl']);
-      decrypted['documentUrl'] = await tryDecrypt(data['documentUrl']);
-    } catch (e) {
-      decrypted['text'] = '[Decryption Error]';
-      decrypted['imageUrl'] = '';
-      decrypted['documentUrl'] = '';
-    }
-
-    return decrypted;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -302,7 +276,6 @@ class _ChatPageState extends State<ChatPage> {
                       itemBuilder: (context, index) {
                         final data = messages[index]['data'] as Map<String, dynamic>;
                         final restricted = messages[index]['restricted'] as bool;
-                        final isCurrentUser = data['senderId'] == widget.currentUserId;
                         final visibility = data['visibility'] ?? 'public';
 
                         if (restricted) {
@@ -311,78 +284,16 @@ class _ChatPageState extends State<ChatPage> {
                               : "You can see this message when you are at work";
                           return Padding(
                             padding: const EdgeInsets.all(10),
-                            child: Text(msg, style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+                            child: Text(
+                              msg,
+                              style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+                            ),
                           );
                         }
 
-                        return FutureBuilder<Map<String, String>>(
-                          future: _decryptMessageData(data),
-                          builder: (context, snapshot) {
-                            if (!snapshot.hasData) return Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Center(child: CircularProgressIndicator()),
-                            );
-
-                            final decrypted = snapshot.data!;
-                            final imageUrl = decrypted['imageUrl'];
-                            final documentUrl = decrypted['documentUrl'];
-                            final text = decrypted['text'];
-
-                            return Column(
-                              crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: isCurrentUser ? Colors.blue : Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      if (imageUrl != null && imageUrl.isNotEmpty)
-                                        GestureDetector(
-                                          onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) => ImageViewerPage(imageUrl: imageUrl),
-                                              ),
-                                            );
-                                          },
-                                          child: Image.network(imageUrl, height: 200),
-                                        ),
-                                      if (text != null && text.isNotEmpty)
-                                        Text(text, style: TextStyle(color: isCurrentUser ? Colors.white : Colors.black)),
-                                      if (documentUrl != null && documentUrl.isNotEmpty)
-                                        GestureDetector(
-                                          onTap: () async {
-                                            final uri = Uri.parse(documentUrl);
-                                            if (await canLaunchUrl(uri)) {
-                                              await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                            } else {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(content: Text('Could not open document')),
-                                              );
-                                            }
-                                          },
-                                          child: Text(
-                                            '📄 Open Document',
-                                            style: TextStyle(
-                                              decoration: TextDecoration.underline,
-                                              color: isCurrentUser ? Colors.white : Colors.blueAccent,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        ),
-                                      Text(visibilityEmoji[visibility] ?? '', style: TextStyle(fontSize: 14)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
+                        return MessageBubble(
+                          data: data,
+                          currentUserId: widget.currentUserId,
                         );
                       },
                     );
@@ -400,7 +311,10 @@ class _ChatPageState extends State<ChatPage> {
                     onTap: _toggleVisibility,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(visibilityEmoji[_visibility]!, style: TextStyle(fontSize: 24)),
+                      child: Text(
+                        visibilityEmoji[_visibility]!,
+                        style: TextStyle(fontSize: 24),
+                      ),
                     ),
                   ),
                   IconButton(icon: Icon(Icons.image), onPressed: _sendImageMessage),

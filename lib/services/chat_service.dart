@@ -19,7 +19,8 @@ class ChatService {
       String message, {
         String visibility = 'public',
       }) async {
-    final encryptedMessage = await CryptoService.encrypt(message, receiverId);
+    final encryptedForSender = await CryptoService.encrypt(message, senderId);
+    final encryptedForReceiver = await CryptoService.encrypt(message, receiverId);
 
     final chatRef = _firestore.collection('chats').doc(chatId);
     final messagesRef = chatRef.collection('messages');
@@ -27,7 +28,8 @@ class ChatService {
     await messagesRef.add({
       'senderId': senderId,
       'receiverId': receiverId,
-      'message': encryptedMessage,
+      'messageForSender': encryptedForSender,
+      'messageForReceiver': encryptedForReceiver,
       'imageUrl': null,
       'documentUrl': null,
       'timestamp': FieldValue.serverTimestamp(),
@@ -36,7 +38,7 @@ class ChatService {
       'visibility': visibility,
     });
 
-    await _updateConversations(senderId, receiverId, encryptedMessage, visibility);
+    await _updateConversations(senderId, receiverId, encryptedForReceiver, visibility);
     await _removeDeletedFlag(receiverId, chatId);
   }
 
@@ -51,13 +53,16 @@ class ChatService {
     final messagesRef = chatRef.collection('messages');
 
     final imageUrl = await _uploadFile(chatId, imageFile, folder: 'chat_images');
-    final encryptedUrl = await CryptoService.encrypt(imageUrl, receiverId);
+    final encryptedForSender = await CryptoService.encrypt(imageUrl, senderId);
+    final encryptedForReceiver = await CryptoService.encrypt(imageUrl, receiverId);
 
     await messagesRef.add({
       'senderId': senderId,
       'receiverId': receiverId,
-      'message': '',
-      'imageUrl': encryptedUrl,
+      'messageForSender': '',
+      'messageForReceiver': '',
+      'imageUrlForSender': encryptedForSender,
+      'imageUrlForReceiver': encryptedForReceiver,
       'documentUrl': null,
       'timestamp': FieldValue.serverTimestamp(),
       'seen': false,
@@ -81,14 +86,17 @@ class ChatService {
     final messagesRef = chatRef.collection('messages');
 
     final documentUrl = await _uploadFile(chatId, documentFile, folder: 'chat_documents');
-    final encryptedUrl = await CryptoService.encrypt(documentUrl, receiverId);
+    final encryptedForSender = await CryptoService.encrypt(documentUrl, senderId);
+    final encryptedForReceiver = await CryptoService.encrypt(documentUrl, receiverId);
 
     await messagesRef.add({
       'senderId': senderId,
       'receiverId': receiverId,
-      'message': '',
+      'messageForSender': '',
+      'messageForReceiver': '',
       'imageUrl': null,
-      'documentUrl': encryptedUrl,
+      'documentUrlForSender': encryptedForSender,
+      'documentUrlForReceiver': encryptedForReceiver,
       'timestamp': FieldValue.serverTimestamp(),
       'seen': false,
       'seenTimestamp': null,
