@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../services/crypto_service.dart';
 import '../screens/image_viewer_page.dart';
 
@@ -13,14 +14,21 @@ class MessageBubble extends StatelessWidget {
     required this.currentUserId,
   }) : super(key: key);
 
+  IconData _getVisibilityIcon(String visibility) {
+    switch (visibility) {
+      case 'home':
+        return FontAwesomeIcons.house;
+      case 'work':
+        return FontAwesomeIcons.briefcase;
+      case 'public':
+      default:
+        return FontAwesomeIcons.earthAmericas;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isCurrentUser = data['senderId'] == currentUserId;
-    final visibilityEmoji = {
-      'public': '🌍',
-      'home': '🏠',
-      'work': '💼',
-    };
     final visibility = data['visibility'] ?? 'public';
 
     final encryptedText = isCurrentUser
@@ -52,6 +60,14 @@ class MessageBubble extends StatelessWidget {
           crossAxisAlignment:
           isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0, left: 12.0, right: 12.0),
+              child: FaIcon(
+                _getVisibilityIcon(visibility),
+                size: 16,
+                color: Colors.grey,
+              ),
+            ),
             Container(
               margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
               padding: const EdgeInsets.all(10),
@@ -102,10 +118,6 @@ class MessageBubble extends StatelessWidget {
                         ),
                       ),
                     ),
-                  Text(
-                    visibilityEmoji[visibility] ?? '',
-                    style: TextStyle(fontSize: 14),
-                  ),
                 ],
               ),
             ),

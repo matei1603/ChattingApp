@@ -1,6 +1,7 @@
 // Updated ChatPage with MessageBubble integration
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -39,10 +40,10 @@ class _ChatPageState extends State<ChatPage> {
   Map<String, dynamic>? currentUserData;
 
   String _visibility = 'public';
-  final Map<String, String> visibilityEmoji = {
-    'public': '🌍',
-    'home': '🏠',
-    'work': '💼',
+  final Map<String, IconData> visibilityIcons = {
+    'public': FontAwesomeIcons.earthAmericas,
+    'home': FontAwesomeIcons.house,
+    'work': FontAwesomeIcons.briefcase,
   };
 
   void _toggleVisibility() {
@@ -311,9 +312,9 @@ class _ChatPageState extends State<ChatPage> {
                     onTap: _toggleVisibility,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        visibilityEmoji[_visibility]!,
-                        style: TextStyle(fontSize: 24),
+                      child: Icon(
+                        visibilityIcons[_visibility],
+                        size: 24,
                       ),
                     ),
                   ),

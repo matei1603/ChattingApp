@@ -68,8 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                      CreateGroupScreen(currentUserId: widget.currentUserId),
+                  builder: (context) => CreateGroupScreen(currentUserId: widget.currentUserId),
                 ),
               );
             },
@@ -80,8 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                      ProfileScreen(currentUserId: widget.currentUserId),
+                  builder: (context) => ProfileScreen(currentUserId: widget.currentUserId),
                 ),
               );
             },
@@ -114,7 +112,6 @@ class _HomeScreenState extends State<HomeScreen> {
               final isGroup = data?['isGroup'] ?? false;
               final contactName = data?['contactName'] ?? 'Unknown';
               final contactImage = data?['contactImage'] ?? '';
-              final lastMessage = data?['lastMessage'] ?? '';
               final lastMessageTimestamp = data?['lastMessageTimestamp'] as Timestamp?;
               final seen = data?['seen'] ?? true;
 
@@ -125,112 +122,104 @@ class _HomeScreenState extends State<HomeScreen> {
                 return SizedBox();
               }
 
-              return FutureBuilder<String>(
-                future: lastMessage.isNotEmpty
-                    ? (CryptoService.isProbablyEncrypted(lastMessage)
-                    ? CryptoService.decryptText(lastMessage)
-                    : Future.value(lastMessage))
-                    : Future.value("No messages yet"),
-                builder: (context, decryptedSnapshot) {
-                  final decryptedText = decryptedSnapshot.data ?? "[Invalid]";
+              final subtitleText = seen ? 'Message' : 'New message';
 
-                  return ListTile(
-                    leading: CircleAvatar(
-                      radius: 24,
-                      backgroundImage: contactImage.isNotEmpty
-                          ? NetworkImage(contactImage)
-                          : const AssetImage('assets/profile_pic.jpg') as ImageProvider,
+              return ListTile(
+                leading: CircleAvatar(
+                  radius: 24,
+                  backgroundImage: contactImage.isNotEmpty
+                      ? NetworkImage(contactImage)
+                      : const AssetImage('assets/profile_pic.jpg') as ImageProvider,
+                ),
+                title: Text(
+                  contactName,
+                  style: TextStyle(
+                    fontWeight: seen ? FontWeight.normal : FontWeight.bold,
+                  ),
+                ),
+                subtitle: Text(
+                  subtitleText,
+                  style: TextStyle(
+                    color: seen ? Colors.black : Colors.blue,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                trailing: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      lastMessageTimestamp != null
+                          ? _formatTimestamp(lastMessageTimestamp)
+                          : "",
+                      style: const TextStyle(fontSize: 12),
                     ),
-                    title: Text(
-                      contactName,
-                      style: TextStyle(
-                        fontWeight: seen ? FontWeight.normal : FontWeight.bold,
-                      ),
-                    ),
-                    subtitle: Text(
-                      decryptedText,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: TextStyle(color: seen ? Colors.black : Colors.blue),
-                    ),
-                    trailing: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          lastMessageTimestamp != null
-                              ? _formatTimestamp(lastMessageTimestamp)
-                              : "",
-                          style: const TextStyle(fontSize: 12),
+                    if (!seen)
+                      const Icon(Icons.circle, color: Colors.red, size: 10),
+                  ],
+                ),
+                onTap: () async {
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(widget.currentUserId)
+                      .collection('conversations')
+                      .doc(contactId)
+                      .update({'seen': true});
+
+                  if (isGroup) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => GroupChatScreen(
+                          groupId: contactId,
+                          currentUserId: widget.currentUserId,
                         ),
-                        if (!seen)
-                          const Icon(Icons.circle, color: Colors.red, size: 10),
+                      ),
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChatPage(
+                          currentUserId: widget.currentUserId,
+                          contactId: contactId,
+                          contactName: contactName,
+                          contactImage: contactImage,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                onLongPress: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text("Delete conversation?"),
+                      content: Text(
+                        "This will hide the conversation from your home screen. You’ll see it again if someone sends a new message.",
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: Text("Cancel"),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: Text("Delete"),
+                        ),
                       ],
                     ),
-                    onTap: () async {
-                      await FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(widget.currentUserId)
-                          .collection('conversations')
-                          .doc(contactId)
-                          .update({'seen': true});
-
-                      if (isGroup) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => GroupChatScreen(
-                              groupId: contactId,
-                              currentUserId: widget.currentUserId,
-                            ),
-                          ),
-                        );
-                      } else {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ChatPage(
-                              currentUserId: widget.currentUserId,
-                              contactId: contactId,
-                              contactName: contactName,
-                              contactImage: contactImage,
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    onLongPress: () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Text("Delete conversation?"),
-                          content: Text(
-                            "This will hide the conversation from your home screen. You’ll see it again if someone sends a new message.",
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: Text("Cancel"),
-                            ),
-                            ElevatedButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              child: Text("Delete"),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      if (confirm == true) {
-                        await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(widget.currentUserId)
-                            .collection('deletedConversations')
-                            .doc(contactId)
-                            .set({'deletedAt': Timestamp.now()});
-                        _fetchDeletedConversations();
-                      }
-                    },
                   );
+
+                  if (confirm == true) {
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(widget.currentUserId)
+                        .collection('deletedConversations')
+                        .doc(contactId)
+                        .set({'deletedAt': Timestamp.now()});
+                    _fetchDeletedConversations();
+                  }
                 },
               );
             },
@@ -244,8 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) =>
-                  AddContactPage(currentUserId: widget.currentUserId),
+              builder: (context) => AddContactPage(currentUserId: widget.currentUserId),
             ),
           );
         },
