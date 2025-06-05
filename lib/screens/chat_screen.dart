@@ -1,16 +1,13 @@
-// Updated ChatPage with MessageBubble integration
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_selector/file_selector.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../services/chat_service.dart';
 import '../services/crypto_service.dart';
 import '../services/location_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'message_request_dialog.dart';
-import 'image_viewer_page.dart';
 import '../screens/message_bubble.dart';
 
 class ChatPage extends StatefulWidget {

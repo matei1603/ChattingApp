@@ -1,16 +1,14 @@
 import 'package:chatting_app/services/crypto_service.dart';
 import 'package:chatting_app/services/notifications_service.dart';
-import 'package:chatting_app/theme/script.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_utilis.dart';
 import 'screens/login.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  // Handle background message here
+
   print('Background message: ${message.notification?.title}');
 }
 void main() async {
@@ -39,6 +37,12 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+        ),
+        useMaterial3: true,
+      ),
       home: LoginPage(),
     );
   }
