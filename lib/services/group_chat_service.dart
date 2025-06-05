@@ -69,7 +69,7 @@ class GroupChatService {
       final groupDoc = await _firestore.collection('chats').doc(groupId).get();
 
       if (!groupDoc.exists) {
-        print("❌ Group does not exist.");
+        print("!!!!! Group does not exist.");
         return;
       }
 
@@ -77,12 +77,12 @@ class GroupChatService {
       print("🧪 Members for group $groupId: $members");
 
       if (members.isEmpty) {
-        print("❌ No members found in group.");
+        print("!!!!! No members found in group.");
         return;
       }
 
       final encrypted = await CryptoService.encryptForGroup(message, members);
-      print("🔐 Message encrypted for group.");
+      print("Message encrypted for group.");
 
       await _firestore.collection('chats').doc(groupId).collection('messages').add({
         'senderId': senderId,
@@ -95,9 +95,9 @@ class GroupChatService {
       });
 
       await _updateLastMessage(groupId, encrypted['data']);
-      print("✅ Message saved to Firestore.");
+      print(" Message saved to Firestore.");
     } catch (e) {
-      print("❌ Error sending group message: $e");
+      print(" Error sending group message: $e");
     }
   }
 
@@ -128,7 +128,7 @@ class GroupChatService {
       final preview = await CryptoService.encryptForGroup('[Image]', members);
       await _updateLastMessage(groupId, preview['data']);
     } catch (e) {
-      print("❌ Error sending image message: $e");
+      print("!!!!!! Error sending image message: $e");
     }
   }
 
@@ -161,7 +161,7 @@ class GroupChatService {
       final preview = await CryptoService.encryptForGroup('[Document]', members);
       await _updateLastMessage(groupId, preview['data']);
     } catch (e) {
-      print("❌ Error sending document: $e");
+      print("!!!!!Error sending document: $e");
     }
   }
 
@@ -185,7 +185,7 @@ class GroupChatService {
         'seenBy': FieldValue.arrayUnion([userId])
       });
     } catch (e) {
-      print("Error marking message as seen: $e");
+      print("!!!!Error marking message as seen: $e");
     }
   }
 
@@ -195,8 +195,8 @@ class GroupChatService {
       await ref.putFile(image);
       return await ref.getDownloadURL();
     } catch (e) {
-      print("Error uploading group image: $e");
-      throw Exception("Failed to upload image.");
+      print("!!!!Error uploading group image: $e");
+      throw Exception("!!!Failed to upload image.");
     }
   }
 
@@ -275,7 +275,7 @@ class GroupChatService {
         'timestamp': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print("Error leaving group: $e");
+      print("!!!!!!Error leaving group: $e");
     }
   }
 

@@ -62,7 +62,6 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                             .doc(blockedUserId)
                             .delete();
 
-                        // Restore conversation after unblocking
                         final userDoc = await FirebaseFirestore.instance.collection('users').doc(blockedUserId).get();
                         if (userDoc.exists) {
                           final contactName = userDoc.data()?['name'] ?? 'Unknown';

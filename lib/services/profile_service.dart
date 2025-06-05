@@ -63,7 +63,7 @@ class ProfileService {
           .child('profile_images')
           .child('$userId.jpg');
 
-      // Upload file with metadata
+      //upload file with metadata
       UploadTask uploadTask = storageRef.putFile(
         image,
         SettableMetadata(contentType: "image/jpeg"),
@@ -71,17 +71,17 @@ class ProfileService {
 
       TaskSnapshot snapshot = await uploadTask;
 
-      //  Get the download URL as a String
+      //get the download URL as a String
       final String imageUrl = await snapshot.ref.getDownloadURL();
 
-      //  Update Firestore profile with the String URL
+      //update Firestore profile with the String URL
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
-        'profileImage': imageUrl, //  Ensuring it's stored as String
+        'profileImage': imageUrl, //check if it's stored as String
       });
 
-      return imageUrl; //  Return the String URL
+      return imageUrl;
     } catch (e) {
-      print(' Error uploading profile image: $e');
+      print(' !!!!Error uploading profile image: $e');
       throw Exception('Failed to upload profile image.');
     }
   }

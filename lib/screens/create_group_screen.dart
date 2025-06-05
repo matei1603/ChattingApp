@@ -22,6 +22,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       appBar: AppBar(title: Text("Create Group")),
       body: Column(
         children: [
+          // Contact List
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
@@ -34,7 +35,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
                 final conversations = snapshot.data!.docs;
 
-                //  Filter to show only individual contacts (not group chats)
                 final filteredContacts = conversations.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
                   final isGroup = data['group'] == true || data['isGroup'] == true;
@@ -73,35 +73,41 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               },
             ),
           ),
+
+
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   decoration: InputDecoration(labelText: "Group Name"),
                   onChanged: (val) => groupName = val,
                 ),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (groupName.isNotEmpty && selectedContacts.length >= 2) {
-                      await _groupChatService.createGroupChat(
-                        widget.currentUserId,
-                        selectedContacts,
-                        groupName,
-                      );
-                      Navigator.pop(context);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Enter a group name and select at least 2 contacts.")),
-                      );
-                    }
-                  },
-                  child: Text("Create Group"),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      if (groupName.isNotEmpty && selectedContacts.length >= 2) {
+                        await _groupChatService.createGroupChat(
+                          widget.currentUserId,
+                          selectedContacts,
+                          groupName,
+                        );
+                        Navigator.pop(context);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Enter a group name and select at least 2 contacts.")),
+                        );
+                      }
+                    },
+                    child: Text("Create Group"),
+                  ),
                 ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );

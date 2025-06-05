@@ -20,7 +20,7 @@ class CryptoService {
     final firestoreKey = doc.data()?['rsaPublicKey'];
 
     if (privateKey != null && publicKey != null) {
-      return; // Keys already initialized
+      return;
     }
 
     throw Exception("Private key not found locally. Use restorePrivateKeyFromCloud.");

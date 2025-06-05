@@ -65,7 +65,7 @@ class _AddPeopleToGroupScreenState extends State<AddPeopleToGroupScreen> {
 
                 final conversations = snapshot.data!.docs;
 
-                // ✅ Filter to exclude groups and already added users
+
                 final filtered = conversations.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
                   final isGroup = data['group'] == true || data['isGroup'] == true;

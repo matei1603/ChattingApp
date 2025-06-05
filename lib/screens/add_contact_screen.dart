@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'blocked_users_screen.dart';
 import '../services/add_contact_service.dart';
 
@@ -44,29 +43,48 @@ class _AddContactPageState extends State<AddContactPage> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("Add Contact")),
-      body: Column(
-        children: [
-          TextField(
-            controller: _emailController,
-            decoration: InputDecoration(labelText: "Email", border: OutlineInputBorder()),
-          ),
-          ElevatedButton(
-            onPressed: _addContact,
-            child: Text("Add Contact"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(
-                builder: (context) => BlockedUsersScreen(currentUserId: widget.currentUserId),
-              ));
-            },
-            child: Text("Blocked Users"),
-          ),
-        ],
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: _emailController,
+              decoration: InputDecoration(
+                labelText: "Email",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _addContact,
+              child: Text("Add Contact"),
+            ),
+            Spacer(),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BlockedUsersScreen(
+                          currentUserId: widget.currentUserId,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Text("Blocked Users"),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
-  }
-}
+  }}

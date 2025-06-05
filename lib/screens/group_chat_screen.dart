@@ -140,7 +140,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           ? await CryptoService.decryptGroupMessage(documentWrapper, widget.currentUserId)
           : '';
     } catch (e) {
-      print("❌ Group decryption failed: $e");
+      print(" !!!!!Group decryption failed: $e");
       decrypted['message'] = '[Group Decryption Failed]';
     }
 
