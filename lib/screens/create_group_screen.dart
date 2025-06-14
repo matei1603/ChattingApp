@@ -12,6 +12,7 @@ class CreateGroupScreen extends StatefulWidget {
 }
 
 class _CreateGroupScreenState extends State<CreateGroupScreen> {
+  //service for handling group chat creation logic
   final GroupChatService _groupChatService = GroupChatService();
   List<String> selectedContacts = [];
   String groupName = "";
@@ -34,7 +35,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
 
                 final conversations = snapshot.data!.docs;
-
                 final filteredContacts = conversations.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
                   final isGroup = data['group'] == true || data['isGroup'] == true;
@@ -54,7 +54,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     final contactName = data['contactName'] ?? "Unknown";
                     final email = data['email'] ?? "";
 
-                    return CheckboxListTile(
+                    return CheckboxListTile(//display each contact with a checkbox for selection
                       title: Text(contactName),
                       subtitle: Text(email, style: TextStyle(color: Colors.grey)),
                       value: selectedContacts.contains(contactId),
@@ -88,7 +88,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () async {
+                    onPressed: () async { //create the group if the name not empty and at least two contacts
                       if (groupName.isNotEmpty && selectedContacts.length >= 2) {
                         await _groupChatService.createGroupChat(
                           widget.currentUserId,

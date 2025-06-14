@@ -21,6 +21,8 @@ class AuthService {
     return _auth.currentUser?.email ?? '';
   }
 
+  //signs in the user with email and password
+  //restores encryption keys and initializes cryptoservice
   Future<User?> signIn(String email, String password) async {
     try {
       final userCredential = await _auth.signInWithEmailAndPassword(
@@ -31,12 +33,13 @@ class AuthService {
 
       if (user != null) {
         try {
+          //restore encrypted private key from cloud storage
           await CryptoService.restorePrivateKeyFromCloud(user.uid, password);
         } catch (e) {
           print("!!!!!!!! Failed to restore private key: $e");
           rethrow;
         }
-
+        //initialize public/private keys in cryptoservice for encryption use
         await CryptoService.initializeKeys(user.uid);
       }
 
@@ -45,7 +48,7 @@ class AuthService {
       throw e;
     }
   }
-
+  //registers a new user stores in firestore and generates encryption keys
   Future<User?> signUp(String email, String password, String name) async {
     try {
       final userCredential = await _auth.createUserWithEmailAndPassword(
@@ -58,7 +61,7 @@ class AuthService {
         await user.updateDisplayName(name);
         await _saveUserToFirestore(user, name);
 
-        //generate and store RSA keys (and upload encrypted private key)
+        //generate and store RSA keys and upload encrypted private key
         await CryptoService.generateAndStoreKeys(user.uid, password);
       }
 

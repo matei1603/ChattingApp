@@ -13,6 +13,8 @@ class CryptoService {
   static final _secureStorage = FlutterSecureStorage();
   static final _firestore = FirebaseFirestore.instance;
 
+
+  //verify if local keys exist and if not advises using restore.
   static Future<void> initializeKeys(String userId) async {
     final privateKey = await _secureStorage.read(key: 'privateKey');
     final publicKey = await _secureStorage.read(key: 'publicKey');
@@ -26,19 +28,25 @@ class CryptoService {
     throw Exception("Private key not found locally. Use restorePrivateKeyFromCloud.");
   }
 
+
+  //generates a new RSA key pair and uploads the public key
+  //encrypts the private key using password-derived AES key and stores it securely
   static Future<void> generateAndStoreKeys(String userId, String password) async {
     final pair = CryptoUtils.generateRSAKeyPair();
     final privatePem = CryptoUtils.encodeRSAPrivateKeyToPem(pair.privateKey as RSAPrivateKey);
     final publicPem = CryptoUtils.encodeRSAPublicKeyToPem(pair.publicKey as RSAPublicKey);
 
+    // derive aes key from password using sha-256
     final key = sha256.convert(utf8.encode(password)).bytes;
     final iv = IV.fromSecureRandom(16);
     final encrypter = Encrypter(AES(Key(Uint8List.fromList(key))));
     final encryptedPrivateKey = encrypter.encrypt(privatePem, iv: iv).base64;
 
+    //store locally
     await _secureStorage.write(key: 'privateKey', value: privatePem);
     await _secureStorage.write(key: 'publicKey', value: publicPem);
 
+    //upload securely
     await _firestore.collection('users').doc(userId).set({
       'rsaPublicKey': publicPem,
       'encryptedPrivateKey': encryptedPrivateKey,
@@ -46,6 +54,7 @@ class CryptoService {
     }, SetOptions(merge: true));
   }
 
+  //restore and decrypt the private key from firestore using the user's password
   static Future<void> restorePrivateKeyFromCloud(String userId, String password) async {
     final doc = await _firestore.collection('users').doc(userId).get();
     final encryptedPrivateKey = doc.data()?['encryptedPrivateKey'];
@@ -67,6 +76,8 @@ class CryptoService {
     await _secureStorage.write(key: 'publicKey', value: publicPem);
   }
 
+
+  //encrypt a message for a single recipient using hybrid encryption aes for the message, rsa for the aes key and iv
   static Future<String> encrypt(String plaintext, String recipientId) async {
     final aesKey = Key.fromSecureRandom(32);
     final iv = IV.fromSecureRandom(16);
@@ -80,9 +91,11 @@ class CryptoService {
     }
 
     final rsaPublic = CryptoUtils.rsaPublicKeyFromPem(publicKeyPem);
+    //encrypt aes key and iv with using rsa algo
     final encryptedKey = base64Encode(_rsaEncryptToBytes(aesKey.base64, rsaPublic));
     final encryptedIv = base64Encode(_rsaEncryptToBytes(iv.base64, rsaPublic));
 
+    //construct final payload as base64-encoded json
     final payload = {
       'key': encryptedKey,
       'iv': encryptedIv,
@@ -91,7 +104,7 @@ class CryptoService {
 
     return base64Encode(utf8.encode(jsonEncode(payload)));
   }
-
+  //encrypt a message for multiple users
   static Future<Map<String, dynamic>> encryptForGroup(String plaintext, List<String> memberIds) async {
     final aesKey = Key.fromSecureRandom(32);
     final iv = IV.fromSecureRandom(16);
@@ -121,7 +134,7 @@ class CryptoService {
       'keys': keysMap,
     };
   }
-
+  //decrypt an encrypted message using the stored private rsa key
   static Future<String> decryptText(String encryptedBase64) async {
     final jsonString = utf8.decode(base64Decode(encryptedBase64));
     final Map<String, dynamic> payload = jsonDecode(jsonString);
@@ -142,7 +155,7 @@ class CryptoService {
     final encrypter = Encrypter(AES(aesKey));
     return encrypter.decrypt64(encryptedData, iv: iv);
   }
-
+  //decrypt a group message using user specific aes key and iv
   static Future<String> decryptGroupMessage(Map<String, dynamic> wrapper, String userId) async {
     final encryptedBase64 = wrapper['data'];
     final keys = wrapper['keys'];
@@ -165,13 +178,13 @@ class CryptoService {
     final encrypter = Encrypter(AES(aesKey));
     return encrypter.decrypt64(encryptedBase64, iv: iv);
   }
-
+  //rsa encryption utility
   static Uint8List _rsaEncryptToBytes(String data, RSAPublicKey publicKey) {
     final encryptor = RSAEngine()
       ..init(true, pc.PublicKeyParameter<RSAPublicKey>(publicKey));
     return Uint8List.fromList(encryptor.process(utf8.encode(data)));
   }
-
+  //rsa decryption utility
   static String _rsaDecryptFromBytes(Uint8List cipherBytes, RSAPrivateKey privateKey) {
     final decryptor = RSAEngine()
       ..init(false, pc.PrivateKeyParameter<RSAPrivateKey>(privateKey));

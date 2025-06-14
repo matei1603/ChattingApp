@@ -18,14 +18,14 @@ class LocationPickerScreen extends StatefulWidget {
 class _LocationPickerScreenState extends State<LocationPickerScreen> {
   LatLng? selectedLocation;
   GoogleMapController? _mapController;
-
+  //moves the map camera to the selected coordinates
   void _goToLocation(LatLng latLng) {
     _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 15));
     setState(() {
       selectedLocation = latLng;
     });
   }
-
+  //opens a search dialog using Google Places autocomplete and navigates to the chosen location
   Future<void> _handleSearch() async {
     final prediction = await PlacesAutocomplete.show(
       context: context,
@@ -48,7 +48,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Pick a Location"),
-        actions: [
+        actions: [ // Opens the search dialog
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: _handleSearch,
@@ -59,7 +59,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         children: [
           GoogleMap(
             initialCameraPosition: const CameraPosition(
-              target: LatLng(45.9432, 24.9668), // Romania default
+              target: LatLng(45.9432, 24.9668), // Romania default coords
               zoom: 6,
             ),
             onMapCreated: (controller) => _mapController = controller,

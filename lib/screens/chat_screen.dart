@@ -61,7 +61,7 @@ class _ChatPageState extends State<ChatPage> {
     _checkIfBlocked();
     _markMessagesAsSeen();
   }
-
+  //loads the timestamp when the user deleted the conversation
   void _loadDeletedAt() async {
     final deletedDoc = await FirebaseFirestore.instance
         .collection('users')
@@ -107,7 +107,7 @@ class _ChatPageState extends State<ChatPage> {
       );
     }
   }
-
+  //verify if the current user is blocked by the contact
   void _checkIfBlocked() async {
     final doc = await FirebaseFirestore.instance
         .collection('users')
@@ -120,7 +120,7 @@ class _ChatPageState extends State<ChatPage> {
       setState(() => isBlocked = true);
     }
   }
-
+  //toggle the blocked status for user
   void _toggleBlockStatus(BuildContext context) async {
     final action = isBlocked ? "Unblock" : "Block";
 
@@ -156,7 +156,7 @@ class _ChatPageState extends State<ChatPage> {
   void _markMessagesAsSeen() async {
     await _chatService.markMessagesAsSeen(chatId, widget.currentUserId);
   }
-
+  //send a text message with visibility tag public home or work
   void _sendMessage() async {
     final msg = _messageController.text.trim();
     if (msg.isNotEmpty) {

@@ -93,7 +93,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     final doc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
     return doc.data()?['name'] ?? 'Unknown';
   }
-
+  //show a screen listing with users that have seen a message
   void _showSeenByDialog(String messageId) async {
     final userNames = await _groupChatService.getSeenUserNames(widget.groupId, messageId);
 
@@ -107,6 +107,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
+  //decrypts message for the user using the per-user AES key from group message key bundle
   Future<Map<String, String>> _decryptGroupMessage(Map<String, dynamic> message) async {
     final decrypted = <String, String>{};
 
@@ -187,7 +188,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             }
 
             return GestureDetector(
-              onLongPress: isCurrentUser ? () => _showSeenByDialog(messageId) : null,
+              onLongPress: isCurrentUser ? () => _showSeenByDialog(messageId) : null, //show list of users who have seen this message if sent by c user
               child: Column(
                 crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
@@ -314,7 +315,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 });
 
                 return ListView.builder(
-                  controller: _scrollController,
+                  controller: _scrollController, //automatically scroll to bottom when new messages arrive
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msgDoc = messages[index];

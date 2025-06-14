@@ -16,13 +16,13 @@ class ContactsService {
       final contactData = querySnapshot.docs.first.data();
       final contactId = querySnapshot.docs.first.id;
       final contactName = contactData['name'] ?? 'Unknown';
-      final contactProfileImage = contactData['profilePicture'] ?? '';
+      final contactProfileImage = contactData['profileImage'] ?? '';
 
       if (contactId == currentUserId) {
         throw Exception("You cannot add yourself as a contact.");
       }
 
-      //we heck if the contact is already in the user's contacts
+      //we check if the contact is already in the user's contacts
       final userDoc = await firestore.collection('users').doc(currentUserId).get();
       final contacts = userDoc.data()?['contacts'] ?? [];
       if (contacts.contains(contactId)) {
@@ -41,7 +41,7 @@ class ContactsService {
       //we send a request to the other person (receiver = contactId)
       await firestore.collection('users').doc(contactId).collection('conversations').doc(currentUserId).set({
         "contactName": userDoc.data()?['name'] ?? 'Unknown',
-        "contactImage": userDoc.data()?['profilePicture'] ?? '',
+        "contactImage": userDoc.data()?['profileImage'] ?? '',
         "lastMessage": "Request Pending",
         "lastMessageTimestamp": FieldValue.serverTimestamp(),
         "accepted": false,

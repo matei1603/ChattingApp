@@ -14,11 +14,7 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  // FirebaseUpdater updater = FirebaseUpdater();
-  // await updater.updateFirebaseStructure();
-  // FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
   NotificationService.requestPermission();
-  //await patchAllUsersConversationsVisibility();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   final user = FirebaseAuth.instance.currentUser;
   if (user != null) {
@@ -26,10 +22,9 @@ void main() async {
   }
   runApp(MyApp());
 }
-@pragma('vm:entry-point') // Required for background messages
+@pragma('vm:entry-point') //required for background messages
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  // await NotificationService.display(message);
 
 }
 class MyApp extends StatelessWidget {

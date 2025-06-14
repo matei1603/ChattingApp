@@ -13,7 +13,7 @@ class MessageBubble extends StatelessWidget {
     required this.data,
     required this.currentUserId,
   }) : super(key: key);
-
+  //returns the correct icon based on the visibility level
   IconData _getVisibilityIcon(String visibility) {
     switch (visibility) {
       case 'home':
@@ -30,7 +30,7 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isCurrentUser = data['senderId'] == currentUserId;
     final visibility = data['visibility'] ?? 'public';
-
+    //use correct encrypted fields depending on user's status(receiver or sender)
     final encryptedText = isCurrentUser
         ? data['messageForSender']
         : data['messageForReceiver'];
@@ -42,6 +42,7 @@ class MessageBubble extends StatelessWidget {
         : data['documentUrlForReceiver'];
 
     return FutureBuilder<Map<String, String>>(
+      //decrypt message content before displaying
       future: _decryptMessage(encryptedText, encryptedImageUrl, encryptedDocumentUrl),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
@@ -78,7 +79,7 @@ class MessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (imageUrl.startsWith('http'))
+                  if (imageUrl.startsWith('http'))  //if image url is present show the image
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -90,14 +91,14 @@ class MessageBubble extends StatelessWidget {
                       },
                       child: Image.network(imageUrl, height: 200),
                     ),
-                  if (text.isNotEmpty && text != '[Decryption Failed]')
+                  if (text.isNotEmpty && text != '[Decryption Failed]') //show decrypted text if available
                     Text(
                       text,
                       style: TextStyle(
                         color: isCurrentUser ? Colors.white : Colors.black,
                       ),
                     ),
-                  if (documentUrl.startsWith('http'))
+                  if (documentUrl.startsWith('http')) //show document download link if available
                     GestureDetector(
                       onTap: () async {
                         final uri = Uri.parse(documentUrl);

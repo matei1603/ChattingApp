@@ -34,7 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     nameController = TextEditingController();
-    _loadUserData();
+    _loadUserData();  //load profile data from firestore
   }
 
   @override
@@ -55,7 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     }
   }
-
+  //user picks a profile image and uploads it
   Future<void> _pickImage() async {
     final status = await Permission.photos.request();
     if (!status.isGranted) return;
@@ -73,7 +73,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
   }
-
+  //opens location picker and saves the selected location
   Future<void> _chooseLocation(String type) async {
     final status = await Permission.location.request();
     if (!status.isGranted) {
@@ -100,7 +100,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-
+  //saves updated user name to firestore
   Future<void> _saveProfile() async {
     try {
       await _profileService.updateUserData(widget.currentUserId, {'name': nameController.text});
@@ -113,7 +113,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update profile.')));
     }
   }
-
+  //toggles between editing and viewing mode
   void _toggleEditMode() {
     if (isEditing) {
       _saveProfile();
@@ -165,7 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             )
                 : Text(name, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
-            ElevatedButton.icon(
+            ElevatedButton.icon( //buttons to pick home or work location
               onPressed: () => _chooseLocation('home'),
               icon: Icon(Icons.home),
               label: Text(homeLocation != null ? "Update Home Location" : "Set Home Location"),

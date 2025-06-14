@@ -18,9 +18,7 @@ class NotificationService {
     flutterLocalNotificationsPlugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // You can navigate to specific screens here using Navigator or any logic
-        print("🔔 Notification tapped: ${response.payload}");
-        // Example: Navigate to chat screen using payload info
+        print(" Notification tapped: ${response.payload}");
       },
     );
   }

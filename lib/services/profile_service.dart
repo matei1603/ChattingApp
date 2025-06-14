@@ -15,12 +15,12 @@ class ProfileService {
       return null;
     }
   }
-
+  //update the firestore profile for user
   Future<void> updateUserData(String userId, Map<String, dynamic> data) async {
     try {
       await _firestore.collection('users').doc(userId).update(data);
 
-      // If the update includes name or profile image, update in all conversations
+      //if the update includes name or profile image update them in all conversations
       if (data.containsKey('name') || data.containsKey('profileImage')) {
         await _updateUserInConversations(userId, data);
       }
@@ -29,7 +29,7 @@ class ProfileService {
       throw Exception('Failed to update profile.');
     }
   }
-
+  //update user image and name in every conv
   Future<void> _updateUserInConversations(String userId, Map<String, dynamic> data) async {
     try {
       QuerySnapshot conversations = await _firestore
@@ -76,7 +76,7 @@ class ProfileService {
 
       //update Firestore profile with the String URL
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
-        'profileImage': imageUrl, //check if it's stored as String
+        'profileImage': imageUrl, //check if it is stored as String
       });
 
       return imageUrl;

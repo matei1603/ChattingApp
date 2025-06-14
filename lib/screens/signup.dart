@@ -13,6 +13,7 @@ class _SignupPageState extends State<SignupPage> {
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
 
+  //handles user registration
   void _signup() async {
     try {
       final user = await _authService.signUp(
@@ -22,7 +23,7 @@ class _SignupPageState extends State<SignupPage> {
       );
       if (user != null) {
         print("Account created successfully!");
-        Navigator.pop(context); // Go back to login page
+        Navigator.pop(context); //go back to login page
       }
     } catch (e) {
       showDialog(

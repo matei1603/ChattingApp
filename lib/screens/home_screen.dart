@@ -18,8 +18,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<String> blockedUsers = [];
-  Map<String, Timestamp> deletedConversations = {};
+  List<String> blockedUsers = []; //list of user ids that the current user has blocked
+  Map<String, Timestamp> deletedConversations = {};//map of deleted conversation IDs to their deletion timestamps
+
 
   @override
   void initState() {
@@ -189,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   }
                 },
-                onLongPress: () async {
+                onLongPress: () async { //marks conversation as deleted locally and it reappears if new message received
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(

@@ -19,6 +19,7 @@ class ChatService {
       String message, {
         String visibility = 'public',
       }) async {
+    //encrypt message separately for sender and receiver
     final encryptedForSender = await CryptoService.encrypt(message, senderId);
     final encryptedForReceiver = await CryptoService.encrypt(message, receiverId);
 
@@ -108,6 +109,7 @@ class ChatService {
     await _removeDeletedFlag(receiverId, chatId);
   }
 
+  //uploads image or document to firebase storage and returns its download URL
   Future<String> _uploadFile(String chatId, File file, {required String folder}) async {
     final storageRef = FirebaseStorage.instance
         .ref()
@@ -129,7 +131,7 @@ class ChatService {
     final senderImage = senderDoc.data()?['profilePicture'] ?? '';
     final receiverName = receiverDoc.data()?['name'] ?? 'Unknown';
     final receiverImage = receiverDoc.data()?['profilePicture'] ?? '';
-
+  //sender’s view of the conversation
     await _firestore
         .collection('users')
         .doc(senderId)
@@ -143,7 +145,7 @@ class ChatService {
       "contactImage": receiverImage,
       "visibility": visibility,
     }, SetOptions(merge: true));
-
+    //receiver’s view of the conversation
     await _firestore
         .collection('users')
         .doc(receiverId)
@@ -199,7 +201,7 @@ class ChatService {
       return querySnapshot;
     });
   }
-
+  //removes the flag so the conversation shows up again if a new message arrives
   Future<void> _removeDeletedFlag(String userId, String chatId) async {
     await _firestore
         .collection('users')

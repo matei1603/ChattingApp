@@ -12,8 +12,9 @@ class _LoginPageState extends State<LoginPage> {
   final AuthService _authService = AuthService();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isPasswordVisible = false;
+  bool _isPasswordVisible = false;  //tracks if password text is visible
 
+  //handles the login logic using authservice
   void _login() async {
     try {
       final user = await _authService.signIn(
@@ -23,7 +24,7 @@ class _LoginPageState extends State<LoginPage> {
 
       if (user != null) {
         print("Login successful!");
-
+        //navigate to home screen and remove login from back stack
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -76,6 +77,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               SizedBox(height: 15),
+              //password input with visibility toggle
               TextField(
                 controller: _passwordController,
                 obscureText: !_isPasswordVisible,
@@ -95,7 +97,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               SizedBox(height: 20),
-              ElevatedButton(
+              ElevatedButton(    //login button
                 onPressed: _login,
                 child: Text("Log In"),
               ),

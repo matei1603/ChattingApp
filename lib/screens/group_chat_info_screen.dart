@@ -41,6 +41,8 @@ class _GroupChatInfoScreenState extends State<GroupChatInfoScreen> {
     }
   }
 
+
+  //change group photo
   Future<void> _pickNewImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -71,7 +73,7 @@ class _GroupChatInfoScreenState extends State<GroupChatInfoScreen> {
     );
     Navigator.pop(context);
   }
-
+//leave group
   Future<void> _leaveGroup() async {
     final confirm = await showDialog<bool>(
       context: context,
